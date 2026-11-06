@@ -9,7 +9,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('History')] class extends Component {
+return new #[Title('History')] class extends Component {
     use WithPagination;
 
     #[Url] public string $search = '';

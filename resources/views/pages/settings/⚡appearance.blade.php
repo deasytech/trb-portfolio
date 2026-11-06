@@ -7,7 +7,7 @@ use Illuminate\Validation\Rule;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Settings')] class extends Component {
+return new #[Title('Settings')] class extends Component {
     public string $theme = 'system';
     public string $timezone = 'UTC';
     public bool $emailNotifications = true;

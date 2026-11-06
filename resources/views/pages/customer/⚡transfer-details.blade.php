@@ -9,7 +9,7 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Transfer Details')] class extends Component {
+return new #[Title('Transfer Details')] class extends Component {
     #[Locked]
     public Transfer $transfer;
 

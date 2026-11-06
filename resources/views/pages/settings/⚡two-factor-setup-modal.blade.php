@@ -8,7 +8,7 @@ use Livewire\Attributes\On;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
-new class extends Component {
+return new class extends Component {
     #[Locked]
     public bool $requiresConfirmation;
 
