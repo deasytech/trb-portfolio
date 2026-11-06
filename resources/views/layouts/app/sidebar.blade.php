@@ -29,10 +29,10 @@
                 <flux:sidebar.item icon="lock-closed" :href="route('customer.holds')" :current="request()->routeIs('customer.holds')" wire:navigate>
                     {{ __('Funds On Hold') }}
                 </flux:sidebar.item>
-                <flux:sidebar.item icon="user" :href="route('profile.edit')" :current="request()->routeIs('profile.edit')" wire:navigate>
+                <flux:sidebar.item icon="user" :href="route('customer.profile')" :current="request()->routeIs('customer.profile')" wire:navigate>
                     {{ __('Profile') }}
                 </flux:sidebar.item>
-                <flux:sidebar.item icon="cog-6-tooth" :href="route('appearance.edit')" :current="request()->routeIs('appearance.edit', 'security.edit')" wire:navigate>
+                <flux:sidebar.item icon="cog-6-tooth" :href="route('customer.settings')" :current="request()->routeIs('customer.settings', 'security.edit')" wire:navigate>
                     {{ __('Settings') }}
                 </flux:sidebar.item>
             </flux:sidebar.nav>

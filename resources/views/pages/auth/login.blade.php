@@ -1,6 +1,9 @@
-<x-layouts::auth :title="__('Log in')">
+<x-layouts::auth.split :title="__('Log in')">
     <div class="flex flex-col gap-6">
-        <x-auth-header :title="__('Log in to your account')" :description="__('Enter your email and password below to log in')" />
+        <div class="space-y-1 text-start">
+            <flux:heading size="xl" level="1">{{ __('Welcome back') }}</flux:heading>
+            <flux:subheading>{{ __('Sign in to your TRB Portfolio account') }}</flux:subheading>
+        </div>
 
         <!-- Session Status -->
         <x-auth-session-status class="text-center" :status="session('status')" />
@@ -45,10 +48,10 @@
             <flux:checkbox name="remember" :label="__('Remember me')" :checked="old('remember')" />
 
             <div class="flex items-center justify-end">
-                <flux:button variant="primary" type="submit" class="w-full" data-test="login-button">
+                <flux:button variant="primary" type="submit" class="w-full bg-trb-blue! hover:bg-trb-blue-hover!" data-test="login-button">
                     {{ __('Log in') }}
                 </flux:button>
             </div>
         </form>
     </div>
-</x-layouts::auth>
+</x-layouts::auth.split>

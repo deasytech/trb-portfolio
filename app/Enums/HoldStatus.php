@@ -19,4 +19,16 @@ enum HoldStatus: string
             self::Expired => 'Expired',
         };
     }
+
+    /**
+     * Badge colour used by the status-badge component.
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::Active => 'amber',
+            self::Released => 'green',
+            self::Expired => 'zinc',
+        };
+    }
 }
