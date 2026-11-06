@@ -23,6 +23,13 @@
     --color-zinc-900: #171717;
     --color-zinc-950: #0a0a0a;
 
+    --color-trb-navy: #101a2d;
+    --color-trb-navy-active: #1f2f4d;
+    --color-trb-canvas: #f3f5f8;
+    --color-trb-blue: #2864e8;
+    --color-trb-blue-hover: #1f52c4;
+    --color-trb-danger: #d92d20;
+
     --color-accent: var(--color-neutral-800);
     --color-accent-content: var(--color-neutral-800);
     --color-accent-foreground: var(--color-white);

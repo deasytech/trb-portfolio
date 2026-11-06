@@ -2,7 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\RoleName;
+use App\Enums\UserStatus;
 use Database\Factories\UserFactory;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -14,11 +18,17 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Permission\Traits\HasRoles;
 
 /**
  * @property int $id
  * @property string $name
+ * @property string|null $customer_reference
  * @property string $email
+ * @property string|null $phone
+ * @property string|null $country
+ * @property UserStatus $status
+ * @property Carbon|null $last_login_at
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $two_factor_secret
@@ -30,10 +40,23 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
+class User extends Authenticatable implements FilamentUser, MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+    use HasFactory, HasRoles, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+
+    protected static function booted(): void
+    {
+        static::creating(function (User $user): void {
+            if ($user->customer_reference === null) {
+                do {
+                    $reference = 'CUS-'.Str::upper(Str::random(8));
+                } while (static::query()->where('customer_reference', $reference)->exists());
+
+                $user->customer_reference = $reference;
+            }
+        });
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -45,7 +68,24 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'status' => UserStatus::class,
+            'last_login_at' => 'datetime',
         ];
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === UserStatus::Active;
+    }
+
+    public function isStaff(): bool
+    {
+        return $this->hasAnyRole(RoleName::staffValues());
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->isStaff() && $this->isActive();
     }
 
     /**

@@ -2,10 +2,13 @@
 
 namespace Database\Factories;
 
+use App\Enums\RoleName;
+use App\Enums\UserStatus;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 /**
  * @extends Factory<User>
@@ -29,6 +32,9 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'phone' => fake()->e164PhoneNumber(),
+            'country' => fake()->countryCode(),
+            'status' => UserStatus::Active,
             'remember_token' => Str::random(10),
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
@@ -56,5 +62,30 @@ class UserFactory extends Factory
             'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1'])),
             'two_factor_confirmed_at' => now(),
         ]);
+    }
+
+    /**
+     * Indicate that the user's account is suspended.
+     */
+    public function suspended(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => UserStatus::Suspended,
+        ]);
+    }
+
+    public function customer(): static
+    {
+        return $this->afterCreating(fn ($user) => $user->assignRole(Role::findOrCreate(RoleName::Customer->value, 'web')));
+    }
+
+    public function administrator(): static
+    {
+        return $this->afterCreating(fn ($user) => $user->assignRole(Role::findOrCreate(RoleName::Administrator->value, 'web')));
+    }
+
+    public function superAdministrator(): static
+    {
+        return $this->afterCreating(fn ($user) => $user->assignRole(Role::findOrCreate(RoleName::SuperAdministrator->value, 'web')));
     }
 }
