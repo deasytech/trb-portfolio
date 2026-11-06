@@ -96,4 +96,4 @@ return new #[Title('History')] class extends Component {
     {
         return LedgerTransaction::query()->whereIn('account_id', Auth::user()->accounts()->select('id'));
     }
-}; 
+};

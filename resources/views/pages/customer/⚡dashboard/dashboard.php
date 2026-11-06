@@ -43,4 +43,4 @@ return new #[Title('Dashboard')] class extends Component {
     {
         return FundsHold::query()->where('customer_id', Auth::id())->where('status', HoldStatus::Active)->latest('id')->limit(5)->get();
     }
-}; 
+};

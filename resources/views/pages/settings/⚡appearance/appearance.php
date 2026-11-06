@@ -45,4 +45,4 @@ return new #[Title('Settings')] class extends Component {
 
         Flux::toast(variant: 'success', text: __('Settings saved.'));
     }
-}; 
+};

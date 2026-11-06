@@ -46,4 +46,4 @@ return new #[Title('Transfer Details')] class extends Component {
 
         return $steps;
     }
-}; 
+};

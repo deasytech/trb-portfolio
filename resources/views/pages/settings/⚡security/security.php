@@ -16,9 +16,9 @@ use Livewire\Attributes\On;
 return new #[Title('Security settings')] class extends Component {
     use PasswordValidationRules;
 
-    public string $current_password = '';
+    public string $currentPassword = '';
     public string $password = '';
-    public string $password_confirmation = '';
+    public string $passwordConfirmation = '';
 
     public bool $canManageTwoFactor;
 
@@ -70,11 +70,12 @@ return new #[Title('Security settings')] class extends Component {
     {
         try {
             $validated = $this->validate([
-                'current_password' => $this->currentPasswordRules(),
-                'password' => $this->passwordRules(),
+                'currentPassword' => $this->currentPasswordRules(),
+                'password' => array_values(array_filter($this->passwordRules(), fn ($rule): bool => $rule !== 'confirmed')),
+                'passwordConfirmation' => ['required', 'same:password'],
             ]);
         } catch (ValidationException $e) {
-            $this->reset('current_password', 'password', 'password_confirmation');
+            $this->reset('currentPassword', 'password', 'passwordConfirmation');
 
             throw $e;
         }
@@ -83,7 +84,7 @@ return new #[Title('Security settings')] class extends Component {
             'password' => $validated['password'],
         ]);
 
-        $this->reset('current_password', 'password', 'password_confirmation');
+        $this->reset('currentPassword', 'password', 'passwordConfirmation');
 
         Flux::toast(variant: 'success', text: __('Password updated.'));
     }
@@ -164,4 +165,4 @@ return new #[Title('Security settings')] class extends Component {
 
         $this->twoFactorEnabled = false;
     }
-}; 
+};

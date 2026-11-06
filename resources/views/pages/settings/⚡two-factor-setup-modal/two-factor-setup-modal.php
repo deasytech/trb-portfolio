@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\TwoFactorSetupUnavailable;
 use Laravel\Fortify\Actions\ConfirmTwoFactorAuthentication;
 use Laravel\Fortify\Actions\EnableTwoFactorAuthentication;
 use Livewire\Attributes\Computed;
@@ -57,7 +58,7 @@ return new class extends Component {
 
         try {
             if (! $user || ! $user->two_factor_secret) {
-                throw new Exception('Two-factor setup secret is not available.');
+                throw new TwoFactorSetupUnavailable;
             }
 
             $this->qrCodeSvg = $user->twoFactorQrCodeSvg();
@@ -156,4 +157,4 @@ return new class extends Component {
             'buttonText' => __('Continue'),
         ];
     }
-}; 
+};

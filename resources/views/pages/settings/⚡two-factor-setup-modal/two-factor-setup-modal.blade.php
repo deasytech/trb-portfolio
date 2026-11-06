@@ -129,7 +129,9 @@
                                     <flux:icon.loading variant="mini"/>
                                 </div>
                             @else
+                                <label for="manual-setup-key" class="sr-only">{{ __('Setup key') }}</label>
                                 <input
+                                    id="manual-setup-key"
                                     type="text"
                                     readonly
                                     value="{{ $manualSetupKey }}"

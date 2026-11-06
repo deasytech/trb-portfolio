@@ -19,4 +19,4 @@ return new #[Title('Account Summary')] class extends Component {
             ->map(fn ($account) => ['account' => $account, 'balance' => $calculator->forAccount($account)])
             ->all();
     }
-}; 
+};
