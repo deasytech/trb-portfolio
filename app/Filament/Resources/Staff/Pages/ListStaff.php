@@ -41,8 +41,23 @@ class ListStaff extends ListRecords
                     /** @var User $actor */
                     $actor = auth()->user();
 
-                    if (! $this->attempt(fn () => app(StaffService::class)->create($data['name'], $data['email'], RoleName::from($data['role']), $actor, $data['reason']))) {
+                    $staff = null;
+
+                    if (! $this->attempt(function () use ($data, $actor, &$staff): void {
+                        $staff = app(StaffService::class)->create($data['name'], $data['email'], RoleName::from($data['role']), $actor, $data['reason']);
+                    })) {
                         $action->halt();
+                    }
+
+                    if (! app(StaffService::class)->sendSetupLink($staff, $actor)) {
+                        Notification::make()
+                            ->title('Staff member added, but the password-setup link could not be sent')
+                            ->body('Open the staff member and use "Resend setup link".')
+                            ->warning()
+                            ->persistent()
+                            ->send();
+
+                        return;
                     }
 
                     Notification::make()->title('Staff member added')->success()->send();

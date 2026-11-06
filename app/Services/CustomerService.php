@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Staff-managed customer profiles. Every change needs customers.manage, a reason and is audited.
@@ -62,7 +63,13 @@ class CustomerService
         $this->authorize($actor);
         $this->assertCustomer($customer);
 
-        return Password::broker()->sendResetLink(['email' => $customer->email]) === Password::RESET_LINK_SENT;
+        try {
+            return Password::broker()->sendResetLink(['email' => $customer->email]) === Password::RESET_LINK_SENT;
+        } catch (Throwable $e) {
+            report($e);
+
+            return false;
+        }
     }
 
     /**

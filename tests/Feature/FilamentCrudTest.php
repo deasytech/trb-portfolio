@@ -9,6 +9,7 @@ use App\Filament\Pages\SystemSettings;
 use App\Filament\Resources\Accounts\Pages\CreateAccount;
 use App\Filament\Resources\Accounts\Pages\EditAccount;
 use App\Filament\Resources\Accounts\Pages\ViewAccount;
+use App\Filament\Resources\Accounts\Schemas\AccountForm;
 use App\Filament\Resources\FundsHolds\Pages\ListFundsHolds;
 use App\Filament\Resources\FundsHolds\Pages\ViewFundsHold;
 use App\Filament\Resources\LedgerTransactions\Pages\ListLedgerTransactions;
@@ -27,10 +28,12 @@ use App\Models\LedgerTransaction;
 use App\Models\Transfer;
 use App\Models\User;
 use App\Services\SettingsService;
+use App\Services\TransferService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -143,6 +146,7 @@ test('staff can create, edit and cancel a transfer for a customer', function () 
             'destination_account_id' => $account->id,
             'beneficiary_name' => 'Sender',
             'amount' => '25.00',
+            'reason' => 'Phone request',
         ]);
 
     $transfer = Transfer::query()->firstOrFail();
@@ -216,4 +220,24 @@ test('staff can resend a customer setup link', function () {
     Livewire::actingAs($this->admin)->test(ViewUser::class, ['record' => $this->customer->getRouteKey()])
         ->callAction('resendSetupLink')
         ->assertNotified('Setup link sent');
+});
+
+test('a staff-created transfer needs a reason and a customer profile', function () {
+    $account = Account::factory()->for($this->customer)->create();
+    $data = ['destination_account_id' => $account->id, 'amount_minor' => 2500];
+    $service = app(TransferService::class);
+
+    expect(fn () => $service->request($this->customer, TransferType::IncomingRequest, $data, 'k1', $this->admin, ' '))->toThrow(ValidationException::class)
+        ->and(fn () => $service->request($this->admin, TransferType::IncomingRequest, $data, 'k2', $this->super, 'Why'))->toThrow(ValidationException::class);
+
+    $transfer = $service->request($this->customer, TransferType::IncomingRequest, $data, 'k3', $this->admin, 'Phone request');
+    expect(AuditEvent::query()->where('event', 'transfer.requested')->where('reason', 'Phone request')->exists())->toBeTrue()
+        ->and($transfer->exists)->toBeTrue();
+});
+
+test('customer search treats wildcards literally', function () {
+    User::factory()->customer()->create(['name' => 'Plain Person']);
+
+    expect(AccountForm::customerOptions('%'))->toBeEmpty()
+        ->and(AccountForm::customerOptions('Plain'))->not->toBeEmpty();
 });

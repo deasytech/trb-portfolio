@@ -6,6 +6,7 @@ use App\Enums\AccountStatus;
 use App\Enums\LedgerDirection;
 use App\Enums\LedgerTransactionType;
 use App\Enums\PermissionName;
+use App\Enums\RoleName;
 use App\Enums\TransferStatus;
 use App\Enums\TransferType;
 use App\Exceptions\InvalidTransferTransition;
@@ -41,10 +42,16 @@ class TransferService
      * @param  array{source_account_id?: int|null, destination_account_id?: int|null, beneficiary_name?: string|null, destination_identifier?: string|null, amount_minor: int, description?: string|null}  $data
      *                                                                                                                                                                                                            When a staff actor is given, the request is raised on the customer's behalf and attributed to the actor.
      */
-    public function request(User $customer, TransferType $type, array $data, string $idempotencyKey, ?User $actor = null): Transfer
+    public function request(User $customer, TransferType $type, array $data, string $idempotencyKey, ?User $actor = null, ?string $reason = null): Transfer
     {
         if ($actor !== null) {
             $this->authorize($actor, PermissionName::ManageTransfers);
+
+            if (! $customer->hasRole(RoleName::Customer->value) || $customer->isStaff()) {
+                throw ValidationException::withMessages(['customer' => 'Transfers can only be raised for customer profiles.']);
+            }
+
+            $reason = $this->requireReason((string) $reason);
         }
 
         $creator = $actor ?? $customer;
@@ -81,7 +88,7 @@ class TransferService
         }
 
         try {
-            $transfer = DB::transaction(function () use ($customer, $creator, $type, $data, $idempotencyKey, $primary, $destination, $amount): Transfer {
+            $transfer = DB::transaction(function () use ($customer, $creator, $actor, $reason, $type, $data, $idempotencyKey, $primary, $destination, $amount): Transfer {
                 $transfer = new Transfer;
                 $transfer->forceFill([
                     'reference' => 'TRF-'.Str::upper(Str::random(12)),
@@ -100,7 +107,7 @@ class TransferService
                     'created_by' => $creator->id,
                 ])->save();
 
-                $this->audit->record('transfer.requested', $transfer, $creator, null, [
+                $this->audit->record('transfer.requested', $transfer, $creator, $actor !== null ? $reason : null, [
                     'type' => $type->value,
                     'amount_minor' => $amount,
                     'currency' => $transfer->currency,
@@ -183,7 +190,13 @@ class TransferService
             }
 
             $from = ['description' => $locked->description, 'beneficiary_name' => $locked->beneficiary_name];
-            $to = ['description' => $data['description'] ?? null, 'beneficiary_name' => $data['beneficiary_name'] ?? null];
+            $beneficiary = array_key_exists('beneficiary_name', $data) ? trim((string) $data['beneficiary_name']) : $locked->beneficiary_name;
+
+            if ($locked->type === TransferType::OutgoingRequest && blank($beneficiary)) {
+                throw ValidationException::withMessages(['beneficiary_name' => 'An outgoing transfer needs a recipient name.']);
+            }
+
+            $to = ['description' => $data['description'] ?? null, 'beneficiary_name' => blank($beneficiary) ? null : $beneficiary];
 
             $locked->forceFill($to)->save();
 

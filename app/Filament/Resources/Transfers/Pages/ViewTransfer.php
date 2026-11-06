@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Transfers\Pages;
 
 use App\Enums\PermissionName;
 use App\Enums\TransferStatus;
+use App\Exceptions\InvalidTransferTransition;
 use App\Filament\Concerns\NotifiesServiceErrors;
 use App\Filament\Resources\Transfers\TransferResource;
 use App\Models\Transfer;
@@ -86,6 +87,12 @@ class ViewTransfer extends ViewRecord
                     $run(app(TransferService::class), $this->getRecord(), $data);
                 } catch (ValidationException $e) {
                     Notification::make()->title(collect($e->errors())->flatten()->first())->danger()->send();
+
+                    return;
+                } catch (InvalidTransferTransition) {
+                    $this->getRecord()->refresh();
+                    $this->refreshFormData(['status']);
+                    Notification::make()->title('This transfer\'s status has changed. Review it and try again.')->danger()->send();
 
                     return;
                 }

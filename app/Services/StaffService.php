@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Staff role and activation changes. Only users holding staff.manage may use it,
@@ -28,7 +29,7 @@ class StaffService
     public function __construct(private AuditLogger $audit) {}
 
     /**
-     * Create a staff account with an unusable random password and email a reset link,
+     * Create a staff account with an unusable random password (use sendSetupLink() to email a reset link),
      * so no credential is ever chosen or shown by the person creating it.
      */
     public function create(string $name, string $email, RoleName $role, User $actor, string $reason): User
@@ -62,11 +63,24 @@ class StaffService
             throw ValidationException::withMessages(['email' => self::EMAIL_IN_USE]);
         }
 
-        if (Password::broker()->sendResetLink(['email' => $staff->email]) !== Password::RESET_LINK_SENT) {
-            throw ValidationException::withMessages(['email' => 'The account was created but the password-setup link could not be sent.']);
-        }
-
         return $staff;
+    }
+
+    /**
+     * Email a password-setup link to a staff member, returning whether it was sent.
+     * Account creation never fails because of mail; callers surface a false result and can resend.
+     */
+    public function sendSetupLink(User $staff, User $actor): bool
+    {
+        $this->authorizeFor($staff, $actor, allowSelf: true);
+
+        try {
+            return Password::broker()->sendResetLink(['email' => $staff->email]) === Password::RESET_LINK_SENT;
+        } catch (Throwable $e) {
+            report($e);
+
+            return false;
+        }
     }
 
     /**
@@ -90,7 +104,11 @@ class StaffService
             if ($emailChanged) {
                 $locked->forceFill(['email_verified_at' => now()]);
             }
-            $locked->save();
+            try {
+                $locked->save();
+            } catch (UniqueConstraintViolationException) {
+                throw ValidationException::withMessages(['email' => self::EMAIL_IN_USE]);
+            }
 
             $this->audit->record('staff.updated', $locked, $actor, $reason, ['email_changed' => $emailChanged]);
 

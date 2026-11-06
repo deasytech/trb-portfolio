@@ -49,6 +49,23 @@ class ViewStaff extends ViewRecord
                     $this->refreshFormData(['name', 'email']);
                     Notification::make()->title('Staff member updated')->success()->send();
                 }),
+            Action::make('resendSetupLink')
+                ->label('Resend setup link')
+                ->requiresConfirmation()
+                ->visible(fn (): bool => $this->actor()->can(PermissionName::ManageStaff->value))
+                ->action(function (): void {
+                    $sent = false;
+
+                    if (! $this->attempt(function () use (&$sent): void {
+                        $sent = app(StaffService::class)->sendSetupLink($this->staff(), $this->actor());
+                    })) {
+                        return;
+                    }
+
+                    $sent
+                        ? Notification::make()->title('Setup link sent')->success()->send()
+                        : Notification::make()->title('The setup link could not be sent')->danger()->send();
+                }),
             Action::make('deleteStaff')
                 ->label('Delete')
                 ->color('danger')

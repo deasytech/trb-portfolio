@@ -17,7 +17,7 @@ php artisan storage:link
 Never run `db:seed` with the demo seeder in production: `DemoDataSeeder` throws outside `local`/`testing`.
 Create the first staff user manually (tinker or a one-off command) and assign a role from `RolesAndPermissionsSeeder`.
 
-Every release: `php artisan down`, deploy, `php artisan migrate --force`, re-cache, `php artisan queue:restart`, `php artisan up`.
+Every release: `php artisan down`, deploy, `php artisan migrate --force`, `php artisan db:seed --class=RolesAndPermissionsSeeder --force` (idempotent; adds new permissions such as `transfers.manage`, syncs them to the staff roles and clears the permission cache), re-cache, `php artisan queue:restart`, `php artisan up`.
 
 ## Processes
 - Queue worker (supervisor): `php artisan queue:work --tries=3 --max-time=3600`

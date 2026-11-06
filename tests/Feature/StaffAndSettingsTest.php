@@ -154,6 +154,7 @@ test('a super administrator can create staff who receive a reset link and an aud
     Notification::fake();
 
     $staff = app(StaffService::class)->create('New Admin', 'New.Admin@Example.com', RoleName::Administrator, $this->super, 'Joined ops');
+    expect(app(StaffService::class)->sendSetupLink($staff, $this->super))->toBeTrue();
 
     expect($staff->email)->toBe('new.admin@example.com')
         ->and($staff->hasRole(RoleName::Administrator->value))->toBeTrue()

@@ -17,10 +17,12 @@ class AccountForm
      *
      * @return array<int, string>
      */
-    private static function customerOptions(string $search = ''): array
+    public static function customerOptions(string $search = ''): array
     {
+        $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
+
         return User::query()->role(RoleName::Customer->value)
-            ->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"))
+            ->where(fn ($q) => $q->whereRaw("name LIKE ? ESCAPE '!'", [$term])->orWhereRaw("email LIKE ? ESCAPE '!'", [$term]))
             ->limit(50)->pluck('name', 'id')->all();
     }
 
