@@ -48,6 +48,7 @@ class PortfolioSummary
             ->whereIn('status', TransferStatus::open())
             ->selectRaw('currency, SUM(amount_minor) AS total, COUNT(*) AS aggregate_count')
             ->groupBy('currency')
+            ->toBase()
             ->get();
 
         foreach ($pending as $group) {
