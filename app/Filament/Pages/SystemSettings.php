@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Enums\PermissionName;
+use App\Filament\Concerns\NotifiesServiceErrors;
 use App\Models\User;
 use App\Services\Money;
 use App\Services\SettingsService;
@@ -16,6 +17,8 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Validation\ValidationException;
 use LogicException;
 use UnitEnum;
 
@@ -24,6 +27,8 @@ use UnitEnum;
  */
 class SystemSettings extends Page
 {
+    use NotifiesServiceErrors;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
     protected static string|UnitEnum|null $navigationGroup = 'System';
@@ -91,7 +96,7 @@ class SystemSettings extends Page
             Action::make('save')
                 ->label('Save settings')
                 ->schema([Textarea::make('reason')->required()->maxLength(500)])
-                ->action(function (array $data): void {
+                ->action(function (array $data, Action $action): void {
                     $values = $this->formSchema()->getState();
 
                     if (! $this->canEditFinancial()) {
@@ -100,7 +105,28 @@ class SystemSettings extends Page
 
                     /** @var User $actor */
                     $actor = auth()->user();
-                    $changed = app(SettingsService::class)->update($values, $actor, $data['reason']);
+                    $changed = [];
+
+                    try {
+                        $saved = $this->attempt(function () use ($values, $actor, $data, &$changed): void {
+                            try {
+                                $changed = app(SettingsService::class)->update($values, $actor, $data['reason']);
+                            } catch (ValidationException $e) {
+                                foreach ($e->errors() as $key => $messages) {
+                                    $this->addError("data.{$key}", (string) $messages[0]);
+                                }
+
+                                throw $e;
+                            }
+                        });
+                    } catch (LockTimeoutException) {
+                        Notification::make()->title('Settings are being updated by someone else. Please try again.')->danger()->send();
+                        $saved = false;
+                    }
+
+                    if (! $saved) {
+                        $action->halt();
+                    }
 
                     $this->fillForm();
 

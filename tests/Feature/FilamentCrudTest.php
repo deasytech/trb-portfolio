@@ -5,6 +5,7 @@ use App\Enums\LedgerDirection;
 use App\Enums\LedgerTransactionType;
 use App\Enums\TransferStatus;
 use App\Enums\TransferType;
+use App\Filament\Pages\SystemSettings;
 use App\Filament\Resources\Accounts\Pages\CreateAccount;
 use App\Filament\Resources\Accounts\Pages\EditAccount;
 use App\Filament\Resources\Accounts\Pages\ViewAccount;
@@ -12,6 +13,7 @@ use App\Filament\Resources\FundsHolds\Pages\ListFundsHolds;
 use App\Filament\Resources\FundsHolds\Pages\ViewFundsHold;
 use App\Filament\Resources\LedgerTransactions\Pages\ListLedgerTransactions;
 use App\Filament\Resources\LedgerTransactions\Pages\ViewLedgerTransaction;
+use App\Filament\Resources\Staff\Pages\ListStaff;
 use App\Filament\Resources\Staff\Pages\ViewStaff;
 use App\Filament\Resources\Transfers\Pages\ListTransfers;
 use App\Filament\Resources\Transfers\Pages\ViewTransfer;
@@ -24,6 +26,7 @@ use App\Models\FundsHold;
 use App\Models\LedgerTransaction;
 use App\Models\Transfer;
 use App\Models\User;
+use App\Services\SettingsService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
 use Filament\Schemas\Schema;
@@ -40,17 +43,18 @@ beforeEach(function () {
 
 test('staff can create, edit and delete a customer with an audit trail', function () {
     Notification::fake();
+    $email = 'ada@example.com';
 
     Livewire::actingAs($this->admin)->test(CreateUser::class)
-        ->fillForm(['name' => 'Ada Obi', 'email' => 'ada@example.com', 'reason' => 'Onboarding'])
+        ->fillForm(['name' => 'Ada Obi', 'email' => $email, 'reason' => 'Onboarding'])
         ->call('create')
         ->assertHasNoFormErrors();
 
-    $ada = User::query()->where('email', 'ada@example.com')->firstOrFail();
+    $ada = User::query()->where('email', $email)->firstOrFail();
     expect($ada->hasRole('customer'))->toBeTrue();
 
     Livewire::actingAs($this->admin)->test(EditUser::class, ['record' => $ada->getRouteKey()])
-        ->fillForm(['name' => 'Ada Okafor', 'email' => 'ada@example.com', 'reason' => 'Name change'])
+        ->fillForm(['name' => 'Ada Okafor', 'email' => $email, 'reason' => 'Name change'])
         ->call('save')
         ->assertHasNoFormErrors();
     expect($ada->refresh()->name)->toBe('Ada Okafor');
@@ -189,4 +193,27 @@ test('searchable account and customer selects preload their options', function (
     $schema = $holds->instance()->getMountedAction()->getSchema(Schema::make($holds->instance()));
     $select = collect($schema->getComponents())->first(fn ($component) => $component->getName() === 'account_id');
     expect($select->getOptions())->toHaveKey($account->id);
+});
+
+test('a duplicate staff email is reported without an error page', function () {
+    Livewire::actingAs($this->super)->test(ListStaff::class)
+        ->callAction('createStaff', ['name' => 'Dup', 'email' => $this->admin->email, 'role' => 'administrator', 'reason' => 'Hire'])
+        ->assertNotified();
+
+    expect(User::query()->where('name', 'Dup')->exists())->toBeFalse();
+});
+
+test('invalid settings are reported on the field instead of crashing', function () {
+    Livewire::actingAs($this->super)->test(SystemSettings::class)
+        ->fillForm([SettingsService::TRANSFER_MIN => 5000, SettingsService::TRANSFER_MAX => 100])
+        ->callAction('save', ['reason' => 'Tune'])
+        ->assertHasErrors(['data.'.SettingsService::TRANSFER_MIN]);
+});
+
+test('staff can resend a customer setup link', function () {
+    Notification::fake();
+
+    Livewire::actingAs($this->admin)->test(ViewUser::class, ['record' => $this->customer->getRouteKey()])
+        ->callAction('resendSetupLink')
+        ->assertNotified('Setup link sent');
 });

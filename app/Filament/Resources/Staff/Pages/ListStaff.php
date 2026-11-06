@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Staff\Pages;
 
 use App\Enums\RoleName;
+use App\Filament\Concerns\NotifiesServiceErrors;
 use App\Filament\Resources\Staff\StaffResource;
 use App\Models\User;
 use App\Services\StaffService;
@@ -15,6 +16,8 @@ use Filament\Resources\Pages\ListRecords;
 
 class ListStaff extends ListRecords
 {
+    use NotifiesServiceErrors;
+
     protected static string $resource = StaffResource::class;
 
     /**
@@ -34,10 +37,14 @@ class ListStaff extends ListRecords
                     Textarea::make('reason')->required()->maxLength(500),
                 ])
                 ->modalDescription('A password-setup link is emailed to the new staff member.')
-                ->action(function (array $data): void {
+                ->action(function (array $data, Action $action): void {
                     /** @var User $actor */
                     $actor = auth()->user();
-                    app(StaffService::class)->create($data['name'], $data['email'], RoleName::from($data['role']), $actor, $data['reason']);
+
+                    if (! $this->attempt(fn () => app(StaffService::class)->create($data['name'], $data['email'], RoleName::from($data['role']), $actor, $data['reason']))) {
+                        $action->halt();
+                    }
+
                     Notification::make()->title('Staff member added')->success()->send();
                 }),
         ];

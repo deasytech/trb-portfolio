@@ -92,9 +92,14 @@ class HoldService
                 throw ValidationException::withMessages(['hold' => 'Only active holds can be edited.']);
             }
 
+            $from = ['reason' => $locked->reason, 'expires_at' => $locked->expires_at?->toIso8601String()];
+
             $locked->forceFill(['reason' => $holdReason, 'expires_at' => $expiresAt])->save();
 
-            $this->audit->record('hold.updated', $locked, $actor, $changeReason);
+            $this->audit->record('hold.updated', $locked, $actor, $changeReason, [
+                'from' => $from,
+                'to' => ['reason' => $holdReason, 'expires_at' => $expiresAt?->toIso8601String()],
+            ]);
 
             return $locked;
         });

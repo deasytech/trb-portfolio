@@ -28,10 +28,37 @@ class ViewUser extends ViewRecord
     {
         return [
             EditAction::make(),
+            $this->resendSetupLinkAction(),
             $this->deleteAction(),
             $this->statusAction('suspend', 'Suspend customer', UserStatus::Suspended, 'danger', UserStatus::Active),
             $this->statusAction('reactivate', 'Reactivate customer', UserStatus::Active, 'success', UserStatus::Suspended),
         ];
+    }
+
+    /**
+     * Email the customer a fresh password-setup link.
+     */
+    private function resendSetupLinkAction(): Action
+    {
+        return Action::make('resendSetupLink')
+            ->label('Resend setup link')
+            ->requiresConfirmation()
+            ->visible(fn (): bool => auth()->user()->can(PermissionName::ManageCustomers->value))
+            ->action(function (): void {
+                /** @var User $customer */
+                $customer = $this->getRecord();
+                $sent = false;
+
+                if (! $this->attempt(function () use ($customer, &$sent): void {
+                    $sent = app(CustomerService::class)->sendSetupLink($customer, auth()->user());
+                })) {
+                    return;
+                }
+
+                $sent
+                    ? Notification::make()->title('Setup link sent')->success()->send()
+                    : Notification::make()->title('The setup link could not be sent')->danger()->send();
+            });
     }
 
     /**

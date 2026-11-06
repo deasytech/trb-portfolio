@@ -24,7 +24,7 @@ class CustomerService
     public function __construct(private AuditLogger $audit) {}
 
     /**
-     * Create a customer with an unusable random password and email a reset link.
+     * Create a customer with an unusable random password; use sendSetupLink() to email the reset link.
      *
      * @param  array{name: string, email: string, phone?: string|null, country?: string|null}  $data
      */
@@ -50,11 +50,19 @@ class CustomerService
             return $customer;
         });
 
-        if (Password::broker()->sendResetLink(['email' => $customer->email]) !== Password::RESET_LINK_SENT) {
-            throw ValidationException::withMessages(['email' => 'The customer was created but the password-setup link could not be sent.']);
-        }
-
         return $customer;
+    }
+
+    /**
+     * Email a password-setup link to a customer, returning whether it was sent.
+     * Creation never fails because of mail; callers surface a false result and can resend.
+     */
+    public function sendSetupLink(User $customer, User $actor): bool
+    {
+        $this->authorize($actor);
+        $this->assertCustomer($customer);
+
+        return Password::broker()->sendResetLink(['email' => $customer->email]) === Password::RESET_LINK_SENT;
     }
 
     /**
@@ -111,9 +119,18 @@ class CustomerService
                 $this->audit->record('customer.deleted', $locked, $actor, $reason, ['email' => $locked->email]);
                 $locked->delete();
             });
-        } catch (QueryException) {
+        } catch (QueryException $e) {
+            if (! $this->isForeignKeyViolation($e)) {
+                throw $e;
+            }
+
             throw ValidationException::withMessages(['customer' => 'This customer has related records. Suspend them instead.']);
         }
+    }
+
+    private function isForeignKeyViolation(QueryException $e): bool
+    {
+        return stripos($e->getMessage(), 'foreign key') !== false;
     }
 
     private function authorize(User $actor): void

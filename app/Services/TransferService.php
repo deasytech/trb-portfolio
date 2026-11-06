@@ -57,9 +57,7 @@ class TransferService
             throw new AuthorizationException('This profile cannot request transfers.');
         }
 
-        if (! $this->settings->transfersEnabled()) {
-            throw ValidationException::withMessages(['amount' => 'Transfer requests are temporarily unavailable. Please try again later.']);
-        }
+        $this->assertTransfersEnabled();
 
         $amount = $data['amount_minor'];
 
@@ -68,13 +66,7 @@ class TransferService
         $primary = $this->ownedActiveAccount($customer, $primaryId, 'account');
         $destination = null;
 
-        ['min' => $min, 'max' => $max] = $this->settings->transferLimits();
-
-        if ($amount < $min || $amount > $max) {
-            throw ValidationException::withMessages([
-                'amount' => 'Enter an amount between '.Money::format($min, $primary->currency).' and '.Money::format($max, $primary->currency).'.',
-            ]);
-        }
+        $this->assertAmountWithinLimits($amount, $primary->currency);
 
         if ($type === TransferType::Internal) {
             $destination = $this->ownedActiveAccount($customer, $data['destination_account_id'] ?? null, 'destination');
@@ -126,6 +118,24 @@ class TransferService
         return $transfer;
     }
 
+    private function assertTransfersEnabled(): void
+    {
+        if (! $this->settings->transfersEnabled()) {
+            throw ValidationException::withMessages(['amount' => 'Transfer requests are temporarily unavailable. Please try again later.']);
+        }
+    }
+
+    private function assertAmountWithinLimits(int $amount, string $currency): void
+    {
+        ['min' => $min, 'max' => $max] = $this->settings->transferLimits();
+
+        if ($amount < $min || $amount > $max) {
+            throw ValidationException::withMessages([
+                'amount' => 'Enter an amount between '.Money::format($min, $currency).' and '.Money::format($max, $currency).'.',
+            ]);
+        }
+    }
+
     public function approve(Transfer $transfer, User $actor): Transfer
     {
         $this->authorize($actor, PermissionName::ApproveTransfers);
@@ -172,12 +182,12 @@ class TransferService
                 throw ValidationException::withMessages(['transfer' => 'Only pending transfers can be edited.']);
             }
 
-            $locked->forceFill([
-                'description' => $data['description'] ?? null,
-                'beneficiary_name' => $data['beneficiary_name'] ?? null,
-            ])->save();
+            $from = ['description' => $locked->description, 'beneficiary_name' => $locked->beneficiary_name];
+            $to = ['description' => $data['description'] ?? null, 'beneficiary_name' => $data['beneficiary_name'] ?? null];
 
-            $this->audit->record('transfer.updated', $locked, $actor, $reason);
+            $locked->forceFill($to)->save();
+
+            $this->audit->record('transfer.updated', $locked, $actor, $reason, ['from' => $from, 'to' => $to]);
 
             return $locked;
         });

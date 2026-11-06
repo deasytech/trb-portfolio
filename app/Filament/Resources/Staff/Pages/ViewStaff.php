@@ -73,7 +73,10 @@ class ViewStaff extends ViewRecord
                 ])
                 ->visible(fn (): bool => $this->canManage())
                 ->action(function (array $data): void {
-                    app(StaffService::class)->changeRole($this->staff(), RoleName::from($data['role']), $this->actor(), $data['reason']);
+                    if (! $this->attempt(fn () => app(StaffService::class)->changeRole($this->staff(), RoleName::from($data['role']), $this->actor(), $data['reason']))) {
+                        return;
+                    }
+
                     $this->refreshRecord();
                     Notification::make()->title('Role updated')->success()->send();
                 }),
@@ -94,7 +97,10 @@ class ViewStaff extends ViewRecord
             ->schema([Textarea::make('reason')->required()->maxLength(500)])
             ->visible(fn (): bool => $this->canManage() && $this->staff()->status === $visibleWhen)
             ->action(function (array $data) use ($target): void {
-                app(StaffService::class)->setStatus($this->staff(), $target, $this->actor(), $data['reason']);
+                if (! $this->attempt(fn () => app(StaffService::class)->setStatus($this->staff(), $target, $this->actor(), $data['reason']))) {
+                    return;
+                }
+
                 $this->refreshRecord();
                 Notification::make()->title('Staff status updated')->success()->send();
             });

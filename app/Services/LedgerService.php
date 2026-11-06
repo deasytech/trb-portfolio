@@ -46,7 +46,7 @@ class LedgerService
 
             $this->assertCanDebit($locked, $direction, $amountMinor);
 
-            $entry = LedgerTransaction::create([
+            $entry = LedgerTransaction::query()->create([
                 'account_id' => $locked->id,
                 'reference' => 'TXN-'.Str::upper(Str::random(12)),
                 'type' => LedgerTransactionType::Adjustment,
@@ -94,7 +94,7 @@ class LedgerService
             $opposite = $original->direction === LedgerDirection::Credit ? LedgerDirection::Debit : LedgerDirection::Credit;
             $this->assertCanDebit($locked, $opposite, $original->amount_minor);
 
-            $reversal = LedgerTransaction::create([
+            $reversal = LedgerTransaction::query()->create([
                 'account_id' => $original->account_id,
                 'reference' => 'TXN-'.Str::upper(Str::random(12)),
                 'type' => LedgerTransactionType::Reversal,

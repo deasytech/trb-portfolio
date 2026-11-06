@@ -20,6 +20,8 @@ use Illuminate\Validation\ValidationException;
  */
 class StaffService
 {
+    private const EMAIL_IN_USE = 'That email address is already in use.';
+
     /**
      * Create the service.
      */
@@ -39,16 +41,11 @@ class StaffService
             throw ValidationException::withMessages(['role' => 'Choose a staff role.']);
         }
 
-        $name = trim($name);
-        $email = mb_strtolower(trim($email));
         $reason = $this->requireReason($reason);
-
-        if ($name === '' || mb_strlen($name) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > 255) {
-            throw ValidationException::withMessages(['email' => 'Enter a name and a valid email address.']);
-        }
+        [$name, $email] = $this->normalizeProfile($name, $email);
 
         if (User::query()->whereRaw('LOWER(email) = ?', [$email])->exists()) {
-            throw ValidationException::withMessages(['email' => 'That email address is already in use.']);
+            throw ValidationException::withMessages(['email' => self::EMAIL_IN_USE]);
         }
 
         try {
@@ -62,7 +59,7 @@ class StaffService
                 return $staff;
             });
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['email' => 'That email address is already in use.']);
+            throw ValidationException::withMessages(['email' => self::EMAIL_IN_USE]);
         }
 
         if (Password::broker()->sendResetLink(['email' => $staff->email]) !== Password::RESET_LINK_SENT) {
@@ -79,15 +76,10 @@ class StaffService
     {
         $this->authorizeFor($staff, $actor, allowSelf: true);
         $reason = $this->requireReason($reason);
-        $name = trim($name);
-        $email = mb_strtolower(trim($email));
-
-        if ($name === '' || mb_strlen($name) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > 255) {
-            throw ValidationException::withMessages(['email' => 'Enter a name and a valid email address.']);
-        }
+        [$name, $email] = $this->normalizeProfile($name, $email);
 
         if (User::query()->whereRaw('LOWER(email) = ?', [$email])->whereKeyNot($staff->id)->exists()) {
-            throw ValidationException::withMessages(['email' => 'That email address is already in use.']);
+            throw ValidationException::withMessages(['email' => self::EMAIL_IN_USE]);
         }
 
         return DB::transaction(function () use ($staff, $name, $email, $actor, $reason): User {
@@ -125,7 +117,11 @@ class StaffService
                 $this->audit->record('staff.deleted', $locked, $actor, $reason, ['email' => $locked->email]);
                 $locked->delete();
             });
-        } catch (QueryException) {
+        } catch (QueryException $e) {
+            if (stripos($e->getMessage(), 'foreign key') === false) {
+                throw $e;
+            }
+
             throw ValidationException::withMessages(['staff' => 'This staff member has recorded activity. Deactivate them instead.']);
         }
     }
@@ -230,6 +226,23 @@ class StaffService
         if (! $others) {
             throw ValidationException::withMessages(['role' => 'At least one active super administrator must remain.']);
         }
+    }
+
+    /**
+     * Trim and validate a name and email, returning both normalised.
+     *
+     * @return array{string, string}
+     */
+    private function normalizeProfile(string $name, string $email): array
+    {
+        $name = trim($name);
+        $email = mb_strtolower(trim($email));
+
+        if ($name === '' || mb_strlen($name) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > 255) {
+            throw ValidationException::withMessages(['email' => 'Enter a name and a valid email address.']);
+        }
+
+        return [$name, $email];
     }
 
     /**
