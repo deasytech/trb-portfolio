@@ -7,6 +7,8 @@ use App\Enums\RoleName;
 use App\Enums\UserStatus;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -49,19 +51,83 @@ class StaffService
             throw ValidationException::withMessages(['email' => 'That email address is already in use.']);
         }
 
-        $staff = DB::transaction(function () use ($name, $email, $role, $actor, $reason): User {
-            $staff = new User(['name' => $name, 'email' => $email, 'password' => Str::random(64)]);
-            $staff->forceFill(['email_verified_at' => now(), 'status' => UserStatus::Active])->save();
-            $staff->assignRole($role->value);
+        try {
+            $staff = DB::transaction(function () use ($name, $email, $role, $actor, $reason): User {
+                $staff = new User(['name' => $name, 'email' => $email, 'password' => Str::random(64)]);
+                $staff->forceFill(['email_verified_at' => now(), 'status' => UserStatus::Active])->save();
+                $staff->assignRole($role->value);
 
-            $this->audit->record('staff.created', $staff, $actor, $reason, ['role' => $role->value]);
+                $this->audit->record('staff.created', $staff, $actor, $reason, ['role' => $role->value]);
 
-            return $staff;
-        });
+                return $staff;
+            });
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['email' => 'That email address is already in use.']);
+        }
 
-        Password::broker()->sendResetLink(['email' => $staff->email]);
+        if (Password::broker()->sendResetLink(['email' => $staff->email]) !== Password::RESET_LINK_SENT) {
+            throw ValidationException::withMessages(['email' => 'The account was created but the password-setup link could not be sent.']);
+        }
 
         return $staff;
+    }
+
+    /**
+     * Update a staff member's name and email, with a reason and an audit event.
+     */
+    public function update(User $staff, string $name, string $email, User $actor, string $reason): User
+    {
+        $this->authorizeFor($staff, $actor, allowSelf: true);
+        $reason = $this->requireReason($reason);
+        $name = trim($name);
+        $email = mb_strtolower(trim($email));
+
+        if ($name === '' || mb_strlen($name) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > 255) {
+            throw ValidationException::withMessages(['email' => 'Enter a name and a valid email address.']);
+        }
+
+        if (User::query()->whereRaw('LOWER(email) = ?', [$email])->whereKeyNot($staff->id)->exists()) {
+            throw ValidationException::withMessages(['email' => 'That email address is already in use.']);
+        }
+
+        return DB::transaction(function () use ($staff, $name, $email, $actor, $reason): User {
+            $locked = User::query()->lockForUpdate()->findOrFail($staff->id);
+            $emailChanged = mb_strtolower($locked->email) !== $email;
+
+            $locked->forceFill(['name' => $name, 'email' => $email]);
+            if ($emailChanged) {
+                $locked->forceFill(['email_verified_at' => now()]);
+            }
+            $locked->save();
+
+            $this->audit->record('staff.updated', $locked, $actor, $reason, ['email_changed' => $emailChanged]);
+
+            return $locked;
+        });
+    }
+
+    /**
+     * Delete a staff account that has no recorded activity; otherwise it must be deactivated instead.
+     */
+    public function delete(User $staff, User $actor, string $reason): void
+    {
+        $this->authorizeFor($staff, $actor);
+        $reason = $this->requireReason($reason);
+
+        try {
+            DB::transaction(function () use ($staff, $actor, $reason): void {
+                $locked = User::query()->lockForUpdate()->findOrFail($staff->id);
+
+                if ($locked->hasRole(RoleName::SuperAdministrator->value)) {
+                    $this->assertAnotherActiveSuperAdministrator($locked);
+                }
+
+                $this->audit->record('staff.deleted', $locked, $actor, $reason, ['email' => $locked->email]);
+                $locked->delete();
+            });
+        } catch (QueryException) {
+            throw ValidationException::withMessages(['staff' => 'This staff member has recorded activity. Deactivate them instead.']);
+        }
     }
 
     /**
@@ -134,7 +200,7 @@ class StaffService
     /**
      * Require a permitted actor acting on another staff account.
      */
-    private function authorizeFor(User $staff, User $actor): void
+    private function authorizeFor(User $staff, User $actor, bool $allowSelf = false): void
     {
         if (! $actor->isActive() || ! $actor->can(PermissionName::ManageStaff->value)) {
             throw new AuthorizationException('You are not permitted to manage staff.');
@@ -144,7 +210,7 @@ class StaffService
             throw new AuthorizationException('Only staff accounts can be managed here.');
         }
 
-        if ($staff->is($actor)) {
+        if (! $allowSelf && $staff->is($actor)) {
             throw new AuthorizationException('You cannot change your own access.');
         }
     }

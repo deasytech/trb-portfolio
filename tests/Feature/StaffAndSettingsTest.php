@@ -61,7 +61,7 @@ test('a super administrator changes a role with a reason and it is audited', fun
     app(StaffService::class)->changeRole($this->admin, RoleName::SuperAdministrator, $this->super, 'Promoted for cover');
 
     expect($this->admin->fresh()->hasRole(RoleName::SuperAdministrator->value))->toBeTrue()
-        ->and(AuditEvent::where('event', 'staff.role_changed')->where('reason', 'Promoted for cover')->exists())->toBeTrue();
+        ->and(AuditEvent::query()->where('event', 'staff.role_changed')->where('reason', 'Promoted for cover')->exists())->toBeTrue();
 });
 
 test('role and status changes need a reason, the permission, and another person', function () {
@@ -100,7 +100,7 @@ test('settings fall back to config until overridden', function () {
     $settings->update([SettingsService::TRANSFER_MAX => 5000], $this->super, 'Tighten limit');
 
     expect($settings->transferMaxMinor())->toBe(5000)
-        ->and(AuditEvent::where('event', 'settings.updated')->first()->metadata)->toMatchArray(['key' => 'transfer_max_minor', 'to' => 5000]);
+        ->and(AuditEvent::query()->where('event', 'settings.updated')->first()->metadata)->toMatchArray(['key' => 'transfer_max_minor', 'to' => 5000]);
 });
 
 test('financial limits need the elevated permission but general settings do not', function () {
@@ -111,7 +111,7 @@ test('financial limits need the elevated permission but general settings do not'
 
     expect(fn () => $settings->update([SettingsService::TRANSFER_MAX => 1], $this->admin, 'x'))->toThrow(AuthorizationException::class)
         ->and(fn () => $settings->update([SettingsService::TRANSFERS_ENABLED => false], $this->admin, 'x'))->toThrow(AuthorizationException::class)
-        ->and(Setting::where('key', SettingsService::TRANSFER_MAX)->exists())->toBeFalse();
+        ->and(Setting::query()->where('key', SettingsService::TRANSFER_MAX)->exists())->toBeFalse();
 });
 
 test('settings reject invalid values, unknown keys and a missing reason', function () {
@@ -159,7 +159,7 @@ test('a super administrator can create staff who receive a reset link and an aud
         ->and($staff->hasRole(RoleName::Administrator->value))->toBeTrue()
         ->and($staff->isActive())->toBeTrue()
         ->and($staff->canAccessPanel(Filament::getPanel('admin')))->toBeTrue()
-        ->and(AuditEvent::where('event', 'staff.created')->where('reason', 'Joined ops')->exists())->toBeTrue();
+        ->and(AuditEvent::query()->where('event', 'staff.created')->where('reason', 'Joined ops')->exists())->toBeTrue();
 
     Notification::assertSentTo($staff, ResetPassword::class);
 });
@@ -181,7 +181,7 @@ test('the staff list page adds a staff member', function () {
         ->callAction('createStaff', ['name' => 'Page Admin', 'email' => 'page@example.com', 'role' => RoleName::Administrator->value, 'reason' => 'New hire'])
         ->assertNotified();
 
-    expect(User::where('email', 'page@example.com')->exists())->toBeTrue();
+    expect(User::query()->where('email', 'page@example.com')->exists())->toBeTrue();
 });
 
 test('customers see the maintenance notice and it is escaped', function () {

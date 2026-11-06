@@ -14,6 +14,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class TransferResource extends Resource
 {
@@ -22,6 +23,10 @@ class TransferResource extends Resource
     protected static ?string $model = Transfer::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowsRightLeft;
+
+    protected static string|UnitEnum|null $navigationGroup = 'Banking';
+
+    protected static ?int $navigationSort = 2;
 
     protected static function viewPermission(): PermissionName
     {

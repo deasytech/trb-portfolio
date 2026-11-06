@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Users\Tables;
 
 use App\Enums\UserStatus;
+use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -27,7 +28,7 @@ class UsersTable
             ->filters([
                 SelectFilter::make('status')->options(collect(UserStatus::cases())->mapWithKeys(fn (UserStatus $s) => [$s->value => $s->label()])),
             ])
-            ->recordActions([ViewAction::make()])
+            ->recordActions([ViewAction::make(), EditAction::make()])
             ->defaultSort('id', 'desc');
     }
 }

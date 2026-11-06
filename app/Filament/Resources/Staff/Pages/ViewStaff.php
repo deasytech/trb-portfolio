@@ -5,12 +5,14 @@ namespace App\Filament\Resources\Staff\Pages;
 use App\Enums\PermissionName;
 use App\Enums\RoleName;
 use App\Enums\UserStatus;
+use App\Filament\Concerns\NotifiesServiceErrors;
 use App\Filament\Resources\Staff\StaffResource;
 use App\Models\User;
 use App\Services\StaffService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 
@@ -19,6 +21,8 @@ use Filament\Resources\Pages\ViewRecord;
  */
 class ViewStaff extends ViewRecord
 {
+    use NotifiesServiceErrors;
+
     protected static string $resource = StaffResource::class;
 
     /**
@@ -27,6 +31,38 @@ class ViewStaff extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('editDetails')
+                ->label('Edit')
+                ->fillForm(fn (): array => ['name' => $this->staff()->name, 'email' => $this->staff()->email])
+                ->schema([
+                    TextInput::make('name')->required()->maxLength(255),
+                    TextInput::make('email')->email()->required()->maxLength(255),
+                    Textarea::make('reason')->required()->maxLength(500),
+                ])
+                ->visible(fn (): bool => $this->actor()->can(PermissionName::ManageStaff->value))
+                ->action(function (array $data): void {
+                    if (! $this->attempt(fn () => app(StaffService::class)->update($this->staff(), $data['name'], $data['email'], $this->actor(), $data['reason']))) {
+                        return;
+                    }
+
+                    $this->getRecord()->refresh();
+                    $this->refreshFormData(['name', 'email']);
+                    Notification::make()->title('Staff member updated')->success()->send();
+                }),
+            Action::make('deleteStaff')
+                ->label('Delete')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->schema([Textarea::make('reason')->required()->maxLength(500)])
+                ->visible(fn (): bool => $this->canManage())
+                ->action(function (array $data): void {
+                    if (! $this->attempt(fn () => app(StaffService::class)->delete($this->staff(), $this->actor(), $data['reason']))) {
+                        return;
+                    }
+
+                    Notification::make()->title('Staff member deleted')->success()->send();
+                    $this->redirect(StaffResource::getUrl('index'));
+                }),
             Action::make('changeRole')
                 ->label('Change role')
                 ->schema([

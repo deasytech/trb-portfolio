@@ -19,6 +19,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use UnitEnum;
 
 class StaffResource extends Resource
 {
@@ -35,6 +36,10 @@ class StaffResource extends Resource
     protected static ?string $navigationLabel = 'Staff';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
+
+    protected static string|UnitEnum|null $navigationGroup = 'People';
+
+    protected static ?int $navigationSort = 2;
 
     /**
      * Staff are visible only to users who can manage staff.

@@ -14,6 +14,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class FundsHoldResource extends Resource
 {
@@ -22,6 +23,10 @@ class FundsHoldResource extends Resource
     protected static ?string $model = FundsHold::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedLockClosed;
+
+    protected static string|UnitEnum|null $navigationGroup = 'Banking';
+
+    protected static ?int $navigationSort = 3;
 
     protected static function viewPermission(): PermissionName
     {

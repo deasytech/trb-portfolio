@@ -17,6 +17,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use LogicException;
+use UnitEnum;
 
 /**
  * Approved operational settings only. Secrets stay in the environment.
@@ -24,6 +25,8 @@ use LogicException;
 class SystemSettings extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
+
+    protected static string|UnitEnum|null $navigationGroup = 'System';
 
     protected static ?string $navigationLabel = 'System settings';
 

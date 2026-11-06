@@ -39,9 +39,16 @@ class TransferService
      * Create a pending transfer request. Repeating the same idempotency key returns the original.
      *
      * @param  array{source_account_id?: int|null, destination_account_id?: int|null, beneficiary_name?: string|null, destination_identifier?: string|null, amount_minor: int, description?: string|null}  $data
+     *                                                                                                                                                                                                            When a staff actor is given, the request is raised on the customer's behalf and attributed to the actor.
      */
-    public function request(User $customer, TransferType $type, array $data, string $idempotencyKey): Transfer
+    public function request(User $customer, TransferType $type, array $data, string $idempotencyKey, ?User $actor = null): Transfer
     {
+        if ($actor !== null) {
+            $this->authorize($actor, PermissionName::ManageTransfers);
+        }
+
+        $creator = $actor ?? $customer;
+
         if ($existing = $this->findByKey($customer, $idempotencyKey)) {
             return $existing;
         }
@@ -82,7 +89,7 @@ class TransferService
         }
 
         try {
-            $transfer = DB::transaction(function () use ($customer, $type, $data, $idempotencyKey, $primary, $destination, $amount): Transfer {
+            $transfer = DB::transaction(function () use ($customer, $creator, $type, $data, $idempotencyKey, $primary, $destination, $amount): Transfer {
                 $transfer = new Transfer;
                 $transfer->forceFill([
                     'reference' => 'TRF-'.Str::upper(Str::random(12)),
@@ -98,10 +105,10 @@ class TransferService
                     'description' => $data['description'] ?? null,
                     'status' => TransferStatus::Pending,
                     'submitted_at' => now(),
-                    'created_by' => $customer->id,
+                    'created_by' => $creator->id,
                 ])->save();
 
-                $this->audit->record('transfer.requested', $transfer, $customer, null, [
+                $this->audit->record('transfer.requested', $transfer, $creator, null, [
                     'type' => $type->value,
                     'amount_minor' => $amount,
                     'currency' => $transfer->currency,
@@ -146,6 +153,45 @@ class TransferService
         }
 
         return $this->transition($transfer, TransferStatus::Cancelled, $customer, 'transfer.cancelled');
+    }
+
+    /**
+     * Staff correction of a pending transfer's descriptive details; amounts and accounts are never edited.
+     *
+     * @param  array{description?: string|null, beneficiary_name?: string|null}  $data
+     */
+    public function updateDetails(Transfer $transfer, User $actor, array $data, string $reason): Transfer
+    {
+        $this->authorize($actor, PermissionName::ManageTransfers);
+        $reason = $this->requireReason($reason);
+
+        return DB::transaction(function () use ($transfer, $actor, $data, $reason): Transfer {
+            $locked = Transfer::query()->lockForUpdate()->findOrFail($transfer->id);
+
+            if ($locked->status !== TransferStatus::Pending) {
+                throw ValidationException::withMessages(['transfer' => 'Only pending transfers can be edited.']);
+            }
+
+            $locked->forceFill([
+                'description' => $data['description'] ?? null,
+                'beneficiary_name' => $data['beneficiary_name'] ?? null,
+            ])->save();
+
+            $this->audit->record('transfer.updated', $locked, $actor, $reason);
+
+            return $locked;
+        });
+    }
+
+    /**
+     * Staff removal of a pending transfer. Records are never deleted; the request is cancelled.
+     */
+    public function cancelAsStaff(Transfer $transfer, User $actor, string $reason): Transfer
+    {
+        $this->authorize($actor, PermissionName::ManageTransfers);
+        $reason = $this->requireReason($reason);
+
+        return $this->transition($transfer, TransferStatus::Cancelled, $actor, 'transfer.cancelled', null, $reason);
     }
 
     public function startProcessing(Transfer $transfer, User $actor): Transfer
