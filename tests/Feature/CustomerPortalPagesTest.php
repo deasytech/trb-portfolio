@@ -43,7 +43,7 @@ test('dashboard shows empty states for a new customer', function () {
 
 test('account summary masks numbers and never shows other customers accounts', function () {
     [$user, $account] = customerWithAccount();
-    $other = Account::factory()->create(['account_number' => '5555555555']);
+    Account::factory()->create(['account_number' => '5555555555']);
 
     $this->actingAs($user)->get(route('customer.account-summary'))
         ->assertOk()
@@ -77,9 +77,9 @@ test('transfers list only shows the customers own transfers', function () {
 
 test('history filters server side and is scoped to the customer', function () {
     [$user, $account] = customerWithAccount();
-    $wanted = LedgerTransaction::factory()->credit(1_000)->create(['account_id' => $account->id, 'reference' => 'TXN-WANTED']);
-    $other = LedgerTransaction::factory()->credit(1_000)->create(['account_id' => $account->id, 'reference' => 'TXN-OTHER']);
-    $foreign = LedgerTransaction::factory()->create(['reference' => 'TXN-FOREIGN']);
+    LedgerTransaction::factory()->credit(1_000)->create(['account_id' => $account->id, 'reference' => 'TXN-WANTED']);
+    LedgerTransaction::factory()->credit(1_000)->create(['account_id' => $account->id, 'reference' => 'TXN-OTHER']);
+    LedgerTransaction::factory()->create(['reference' => 'TXN-FOREIGN']);
 
     $this->actingAs($user);
 
