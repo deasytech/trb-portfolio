@@ -103,6 +103,14 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail, Pas
     }
 
     /**
+     * Timezone used when presenting dates to this customer.
+     */
+    public function displayTimezone(): string
+    {
+        return $this->preference?->timezone ?? config('app.timezone');
+    }
+
+    /**
      * Whether the account may sign in and use the application.
      */
     public function isActive(): bool

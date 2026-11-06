@@ -1,50 +1,3 @@
-<?php
-
-use Laravel\Fortify\Actions\GenerateNewRecoveryCodes;
-use Livewire\Attributes\Locked;
-use Livewire\Component;
-
-new class extends Component {
-    #[Locked]
-    public array $recoveryCodes = [];
-
-    /**
-     * Load the recovery codes so the user can view them.
-     */
-    public function viewRecoveryCodes(): void
-    {
-        $this->loadRecoveryCodes();
-    }
-
-    /**
-     * Generate new recovery codes for the user.
-     */
-    public function regenerateRecoveryCodes(GenerateNewRecoveryCodes $generateNewRecoveryCodes): void
-    {
-        $generateNewRecoveryCodes(auth()->user());
-
-        $this->loadRecoveryCodes();
-    }
-
-    /**
-     * Load the recovery codes for the user.
-     */
-    private function loadRecoveryCodes(): void
-    {
-        $user = auth()->user();
-
-        if ($user->hasEnabledTwoFactorAuthentication() && $user->two_factor_recovery_codes) {
-            try {
-                $this->recoveryCodes = json_decode(decrypt($user->two_factor_recovery_codes), true);
-            } catch (Exception) {
-                $this->addError('recoveryCodes', 'Failed to load recovery codes');
-
-                $this->recoveryCodes = [];
-            }
-        }
-    }
-}; ?>
-
 <div
     class="py-6 space-y-6 border shadow-sm rounded-xl border-zinc-200 dark:border-white/10"
     wire:cloak
@@ -112,21 +65,19 @@ new class extends Component {
                 @enderror
 
                 @if (filled($recoveryCodes))
-                    <div
+                    <ul
                         class="grid gap-1 p-4 font-mono text-sm rounded-lg bg-zinc-100 dark:bg-white/5"
-                        role="list"
                         aria-label="{{ __('Recovery codes') }}"
                     >
                         @foreach($recoveryCodes as $code)
-                            <div
-                                role="listitem"
+                            <li
                                 class="select-text"
                                 wire:loading.class="opacity-50 animate-pulse"
                             >
                                 {{ $code }}
-                            </div>
+                            </li>
                         @endforeach
-                    </div>
+                    </ul>
                     <flux:text variant="subtle" class="text-xs">
                         {{ __('Each recovery code can be used once to access your account and will be removed after use. If you need more, click Regenerate codes above.') }}
                     </flux:text>
