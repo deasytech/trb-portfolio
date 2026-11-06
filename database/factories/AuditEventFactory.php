@@ -19,8 +19,8 @@ class AuditEventFactory extends Factory
         return [
             'actor_id' => User::factory(),
             'event' => 'demo.event',
-            'subject_type' => 'user',
-            'subject_id' => 1,
+            'subject_type' => (new User)->getMorphClass(),
+            'subject_id' => User::factory(),
             'metadata' => [],
         ];
     }

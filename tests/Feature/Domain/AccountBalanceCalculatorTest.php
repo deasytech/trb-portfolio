@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\HoldStatus;
 use App\Models\Account;
 use App\Models\FundsHold;
 use App\Models\LedgerTransaction;
@@ -44,7 +45,8 @@ test('available balance subtracts the remaining amount of active holds', functio
 test('released and expired holds do not reduce available balance', function () {
     $account = Account::factory()->create();
     LedgerTransaction::factory()->for($account)->credit(10_000)->create();
-    FundsHold::factory()->for($account)->released()->create();
+    FundsHold::factory()->for($account)->released()->create(['remaining_amount_minor' => 1_500, 'expires_at' => null]);
+    FundsHold::factory()->for($account)->create(['status' => HoldStatus::Expired, 'remaining_amount_minor' => 1_500, 'expires_at' => null]);
     FundsHold::factory()->for($account)->create(['expires_at' => now()->subMinute()]);
 
     expect(balanceOf($account)->availableMinor())->toBe(10_000);
@@ -66,3 +68,17 @@ test('balances are isolated per account', function () {
 
     expect(balanceOf($mine)->availableMinor())->toBe(0);
 });
+
+test('a ledger row in another currency is rejected rather than counted', function () {
+    $account = Account::factory()->create(['currency' => 'USD']);
+    LedgerTransaction::factory()->for($account)->credit(10_000)->create(['currency' => 'EUR']);
+
+    balanceOf($account);
+})->throws(LogicException::class);
+
+test('an active hold in another currency is rejected rather than counted', function () {
+    $account = Account::factory()->create(['currency' => 'USD']);
+    FundsHold::factory()->for($account)->create(['currency' => 'EUR']);
+
+    balanceOf($account);
+})->throws(LogicException::class);
