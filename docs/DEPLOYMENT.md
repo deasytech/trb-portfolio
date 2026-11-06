@@ -7,6 +7,7 @@ PHP 8.3, Composer, Node 20+, MySQL 8 / PostgreSQL 15+ (SQLite is for local/testi
 ```bash
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build
+php artisan filament:assets   # also runs via composer's post-autoload-dump; the staff panel is unstyled without it
 cp .env.example .env && php artisan key:generate   # then edit .env (below)
 php artisan migrate --force
 php artisan db:seed --class=RolesAndPermissionsSeeder --force   # roles/permissions only

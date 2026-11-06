@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\Money;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\Str;
 
 /**
  * Operational snapshot. Money is always grouped by currency, never summed across currencies.
@@ -47,7 +48,7 @@ class AdminOverview extends StatsOverviewWidget
                 ->description('Approved or processing'),
             Stat::make('Active holds', FundsHold::query()->reserving()->count()),
             Stat::make('Active customers', User::query()->role(RoleName::Customer->value)->where('status', UserStatus::Active->value)->count())
-                ->description(Account::query()->count().' accounts'),
+                ->description(Str::of('account')->plural($accounts = Account::query()->count())->prepend($accounts.' ')->toString()),
         ];
 
         if ($user instanceof User && $user->can(PermissionName::ViewLedger->value)) {
