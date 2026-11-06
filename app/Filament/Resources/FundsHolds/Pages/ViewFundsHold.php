@@ -27,11 +27,12 @@ class ViewFundsHold extends ViewRecord
                 ->color('success')
                 ->requiresConfirmation()
                 ->schema([Textarea::make('reason')->required()->maxLength(500)])
-                ->visible(fn (): bool => auth()->user()->can(PermissionName::ReleaseHolds->value) && $this->getRecord()->status === HoldStatus::Active)
+                ->visible(fn (): bool => auth()->user()->can(PermissionName::ReleaseHolds->value) && $this->getRecord()->effectiveStatus() === HoldStatus::Active)
                 ->action(function (array $data): void {
                     /** @var FundsHold $hold */
                     $hold = $this->getRecord();
                     app(HoldService::class)->release($hold, auth()->user(), $data['reason']);
+                    $hold->refresh();
                     $this->refreshFormData(['status', 'remaining_amount_minor']);
                     Notification::make()->title('Hold released')->success()->send();
                 }),

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -29,12 +30,18 @@ return new #[Title('Transfers')] class extends Component {
     public bool $confirmingOut = false;
     public string $outKey = '';
 
+    #[Locked]
+    public string $outReview = '';
+
     public string $depositAccountId = '';
     public string $senderName = '';
     public string $expectedAmount = '';
     public string $depositReference = '';
     public bool $confirmingIn = false;
     public string $inKey = '';
+
+    #[Locked]
+    public string $inReview = '';
 
     public function mount(): void
     {
@@ -54,6 +61,7 @@ return new #[Title('Transfers')] class extends Component {
     public function reviewOut(): void
     {
         $this->validateOut();
+        $this->outReview = $this->outFingerprint();
         $this->confirmingOut = true;
     }
 
@@ -77,7 +85,13 @@ return new #[Title('Transfers')] class extends Component {
 
     public function submitOut(TransferService $transfers): void
     {
-        if (! $this->confirmingOut || $this->tooManySubmissions()) {
+        if (! $this->confirmingOut || ! hash_equals($this->outReview, $this->outFingerprint())) {
+            $this->confirmingOut = false;
+
+            return;
+        }
+
+        if ($this->tooManySubmissions()) {
             return;
         }
 
@@ -107,6 +121,7 @@ return new #[Title('Transfers')] class extends Component {
     public function reviewIn(): void
     {
         $this->validateIn();
+        $this->inReview = $this->inFingerprint();
         $this->confirmingIn = true;
     }
 
@@ -127,7 +142,13 @@ return new #[Title('Transfers')] class extends Component {
 
     public function submitIn(TransferService $transfers): void
     {
-        if (! $this->confirmingIn || $this->tooManySubmissions()) {
+        if (! $this->confirmingIn || ! hash_equals($this->inReview, $this->inFingerprint())) {
+            $this->confirmingIn = false;
+
+            return;
+        }
+
+        if ($this->tooManySubmissions()) {
             return;
         }
 
@@ -152,6 +173,19 @@ return new #[Title('Transfers')] class extends Component {
         $this->reset('depositAccountId', 'senderName', 'expectedAmount', 'depositReference', 'confirmingIn');
         $this->inKey = (string) Str::uuid();
         $this->announce($transfer);
+    }
+
+    /**
+     * Fingerprint of the values the customer reviewed, so edits after review need a fresh review.
+     */
+    private function outFingerprint(): string
+    {
+        return hash('sha256', json_encode([$this->sourceAccountId, $this->destinationKind, $this->destinationAccountId, $this->beneficiaryName, $this->destinationIdentifier, $this->outAmount, $this->outDescription]));
+    }
+
+    private function inFingerprint(): string
+    {
+        return hash('sha256', json_encode([$this->depositAccountId, $this->senderName, $this->expectedAmount, $this->depositReference]));
     }
 
     private function tooManySubmissions(): bool

@@ -31,6 +31,11 @@ class AdminPanelProvider extends PanelProvider
             ->brandName('TRB Portfolio Staff')
             ->colors([
                 'primary' => Color::Blue,
+                'green' => Color::Green,
+                'amber' => Color::Amber,
+                'zinc' => Color::Zinc,
+                'blue' => Color::Blue,
+                'red' => Color::Red,
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')

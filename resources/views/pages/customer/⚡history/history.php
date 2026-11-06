@@ -39,6 +39,17 @@ return new #[Title('History')] class extends Component {
         ];
     }
 
+    public function rendering(): void
+    {
+        // Filters can arrive via the URL; validate before rendering so errors show with the controls.
+        try {
+            $this->validate();
+        } catch (ValidationException $e) {
+            // Keep the errors for display; transactions() returns an empty page.
+            $this->setErrorBag($e->validator->errors());
+        }
+    }
+
     public function updated(string $property): void
     {
         if ($property !== 'selectedId') {
@@ -81,10 +92,7 @@ return new #[Title('History')] class extends Component {
     {
         $query = $this->baseQuery()->with('account')->latest('posted_at')->latest('id');
 
-        // Filters can arrive via the URL, so validate before they reach the query.
-        try {
-            $this->validate();
-        } catch (ValidationException) {
+        if ($this->getErrorBag()->isNotEmpty()) {
             return $query->whereRaw('1 = 0')->paginate(15);
         }
 

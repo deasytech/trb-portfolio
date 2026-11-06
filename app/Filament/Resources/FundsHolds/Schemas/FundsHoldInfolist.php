@@ -15,7 +15,7 @@ class FundsHoldInfolist
         return $schema->components([
             TextEntry::make('reference'),
             TextEntry::make('customer.name')->label('Customer'),
-            TextEntry::make('status')->badge()->formatStateUsing(fn (HoldStatus $state): string => $state->label())->color(fn (HoldStatus $state): string => $state->color()),
+            TextEntry::make('status')->badge()->state(fn (FundsHold $record): HoldStatus => $record->effectiveStatus())->formatStateUsing(fn (HoldStatus $state): string => $state->label())->color(fn (HoldStatus $state): string => $state->color()),
             TextEntry::make('amount_minor')->label('Original amount')->formatStateUsing(fn (int $state, FundsHold $record): string => Money::format($state, $record->currency)),
             TextEntry::make('remaining_amount_minor')->label('Remaining')->formatStateUsing(fn (int $state, FundsHold $record): string => Money::format($state, $record->currency)),
             TextEntry::make('reason'),

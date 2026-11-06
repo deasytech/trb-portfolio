@@ -39,6 +39,7 @@ class ViewAccount extends ViewRecord
                 /** @var Account $account */
                 $account = $this->getRecord();
                 app(AdminActions::class)->setAccountStatus($account, $target, auth()->user(), $data['reason']);
+                $account->refresh();
                 $this->refreshFormData(['status']);
                 Notification::make()->title('Account status updated')->success()->send();
             });

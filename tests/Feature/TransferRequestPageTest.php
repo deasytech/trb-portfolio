@@ -29,6 +29,24 @@ test('submitting without reviewing first creates nothing', function () {
     expect(Transfer::count())->toBe(0);
 });
 
+test('a deposit notification submitted without review creates nothing', function () {
+    Livewire::test('pages::customer.transfers')
+        ->set('depositAccountId', (string) $this->account->id)
+        ->set('senderName', 'Acme Ltd')
+        ->set('expectedAmount', '75.50')
+        ->call('submitIn');
+
+    expect(Transfer::count())->toBe(0);
+});
+
+test('editing after review requires a fresh review', function () {
+    $component = fillOutgoing(Livewire::test('pages::customer.transfers'))->call('reviewOut');
+
+    $component->set('outAmount', '900.00')->call('submitOut')->assertSet('confirmingOut', false);
+
+    expect(Transfer::count())->toBe(0);
+});
+
 test('a transfer out needs explicit confirmation before it is created', function () {
     $component = fillOutgoing(Livewire::test('pages::customer.transfers'))->call('reviewOut');
 

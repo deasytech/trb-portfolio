@@ -21,8 +21,10 @@ use App\Models\FundsHold;
 use App\Models\LedgerTransaction;
 use App\Models\Transfer;
 use App\Models\User;
+use App\Services\AdminActions;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Access\AuthorizationException;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -68,7 +70,7 @@ test('an administrator can approve a pending transfer from the admin panel', fun
         ->callAction('approve');
 
     expect($transfer->refresh()->status)->toBe(TransferStatus::Approved);
-    expect(AuditEvent::where('event', 'transfer.approved')->exists())->toBeTrue();
+    expect(AuditEvent::query()->where('event', 'transfer.approved')->exists())->toBeTrue();
 });
 
 test('rejecting a transfer requires a reason', function () {
@@ -116,8 +118,34 @@ test('staff can freeze and unfreeze accounts with an audit trail', function () {
 
     expect($this->account->refresh()->status)->toBe(AccountStatus::Frozen);
 
-    $event = AuditEvent::where('event', 'account.status_changed')->firstOrFail();
+    $event = AuditEvent::query()->where('event', 'account.status_changed')->firstOrFail();
     expect($event->reason)->toBe('Suspicious activity')->and($event->actor_id)->toBe($admin->id);
+
+    Livewire::actingAs($admin)->test(ViewAccount::class, ['record' => $this->account->getRouteKey()])
+        ->callAction('unfreeze', ['reason' => 'Cleared']);
+
+    expect($this->account->refresh()->status)->toBe(AccountStatus::Active);
+
+    $unfreeze = AuditEvent::query()->where('event', 'account.status_changed')->latest('id')->firstOrFail();
+    expect($unfreeze->reason)->toBe('Cleared')
+        ->and($unfreeze->metadata['from'] ?? null)->toBe('frozen')
+        ->and($unfreeze->metadata['to'] ?? null)->toBe('active');
+});
+
+test('an approved transfer can be rejected or failed from the admin panel', function (string $action) {
+    $transfer = Transfer::factory()->for($this->customer, 'customer')->create(['status' => TransferStatus::Approved]);
+
+    Livewire::actingAs(User::factory()->administrator()->create())
+        ->test(ViewTransfer::class, ['record' => $transfer->getRouteKey()])
+        ->assertActionVisible($action);
+})->with(['reject', 'fail', 'complete']);
+
+test('administrators cannot suspend staff without the staff permission', function () {
+    $admin = User::factory()->administrator()->create();
+    $other = User::factory()->administrator()->create();
+
+    expect(fn () => app(AdminActions::class)->setCustomerStatus($other, UserStatus::Suspended, $admin, 'x'))
+        ->toThrow(AuthorizationException::class);
 });
 
 test('staff can suspend a customer but a reason is required', function () {

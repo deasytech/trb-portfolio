@@ -39,6 +39,7 @@ class ViewUser extends ViewRecord
                 /** @var User $customer */
                 $customer = $this->getRecord();
                 app(AdminActions::class)->setCustomerStatus($customer, $target, auth()->user(), $data['reason']);
+                $customer->refresh();
                 $this->refreshFormData(['status']);
                 Notification::make()->title('Customer status updated')->success()->send();
             });

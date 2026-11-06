@@ -258,3 +258,14 @@ test('a completed transfer cannot be sent back to pending', function () {
     expect(fn () => $this->service->cancel($transfer, $this->customer))->toThrow(InvalidTransferTransition::class)
         ->and(fn () => $this->service->reject($transfer, $this->admin, 'x'))->toThrow(InvalidTransferTransition::class);
 });
+
+test('a queued status notification reports the status it was created with', function () {
+    $transfer = Transfer::factory()->for($this->customer, 'customer')->create(['status' => TransferStatus::Approved]);
+
+    $notification = unserialize(serialize(new TransferStatusChanged($transfer)));
+    $transfer->forceFill(['status' => TransferStatus::Completed])->save();
+    $notification = unserialize(serialize($notification));
+
+    expect($notification->toArray($this->customer)['status'])->toBe('approved')
+        ->and($notification->toMail($this->customer)->subject)->toContain('Approved');
+});

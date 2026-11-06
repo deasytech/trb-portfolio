@@ -15,7 +15,15 @@
             <dt class="text-zinc-500">{{ __('Source account') }}</dt>
             <dd>{{ $transfer->sourceAccount?->maskedNumber() ?? '—' }}</dd>
             <dt class="text-zinc-500">{{ __('Destination account') }}</dt>
-            <dd>{{ $transfer->destinationAccount?->maskedNumber() ?? '—' }}</dd>
+            <dd>
+                @if ($transfer->destinationAccount)
+                    {{ $transfer->destinationAccount->maskedNumber() }}
+                @elseif (filled($transfer->destination_identifier))
+                    {{ '•••• '.\Illuminate\Support\Str::substr($transfer->destination_identifier, -4) }}
+                @else
+                    —
+                @endif
+            </dd>
             <dt class="text-zinc-500">{{ __('Recipient / sender') }}</dt>
             <dd>{{ $transfer->beneficiary_name ?? '—' }}</dd>
             <dt class="text-zinc-500">{{ __('Amount') }}</dt>

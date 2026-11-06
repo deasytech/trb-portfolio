@@ -21,6 +21,9 @@ class AdminActions
     public function setCustomerStatus(User $customer, UserStatus $status, User $actor, string $reason): User
     {
         $this->authorize($actor, PermissionName::SuspendCustomers);
+        if ($customer->isStaff()) {
+            $this->authorize($actor, PermissionName::ManageStaff);
+        }
         $reason = $this->requireReason($reason);
 
         return DB::transaction(function () use ($customer, $status, $actor, $reason): User {

@@ -21,6 +21,11 @@ class ListFundsHolds extends ListRecords
 {
     protected static string $resource = FundsHoldResource::class;
 
+    private static function accountLabel(Account $account): string
+    {
+        return "{$account->user?->name} •••• {$account->account_number_last_four} ({$account->currency})";
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -34,8 +39,9 @@ class ListFundsHolds extends ListRecords
                             ->where('account_number_last_four', 'like', "%{$search}%")
                             ->orWhereHas('user', fn ($q) => $q->where('name', 'like', "%{$search}%"))
                             ->limit(20)->get()
-                            ->mapWithKeys(fn (Account $a): array => [$a->id => "{$a->user?->name} •••• {$a->account_number_last_four} ({$a->currency})"])
-                            ->all()),
+                            ->mapWithKeys(fn (Account $a): array => [$a->id => self::accountLabel($a)])
+                            ->all())
+                        ->getOptionLabelUsing(fn ($value): ?string => ($account = Account::query()->with('user')->whereKey($value)->first()) ? self::accountLabel($account) : null),
                     TextInput::make('amount')->required()->numeric()->minValue(0.01),
                     DateTimePicker::make('expires_at')->after('now'),
                     Textarea::make('reason')->required()->maxLength(500),

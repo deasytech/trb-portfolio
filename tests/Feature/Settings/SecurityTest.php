@@ -98,6 +98,36 @@ test('two factor setup does not reveal the secret when already enabled', functio
     expect(decrypt($user->refresh()->two_factor_secret))->toBe('test-secret');
 });
 
+test('two factor can be disabled after a fresh password confirmation', function () {
+    $user = User::factory()->create();
+    $user->forceFill([
+        'two_factor_secret' => encrypt('test-secret'),
+        'two_factor_recovery_codes' => encrypt(json_encode(['code1'])),
+        'two_factor_confirmed_at' => now(),
+    ])->save();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()]);
+
+    Livewire::test('pages::settings.security')->call('disable');
+
+    expect($user->refresh()->two_factor_secret)->toBeNull();
+});
+
+test('recovery codes stay hidden when password confirmation has expired', function () {
+    $user = User::factory()->create();
+    $user->forceFill([
+        'two_factor_secret' => encrypt('test-secret'),
+        'two_factor_recovery_codes' => encrypt(json_encode(['code1'])),
+        'two_factor_confirmed_at' => now(),
+    ])->save();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time() - 100_000]);
+
+    Livewire::test('pages::settings.two-factor.recovery-codes')
+        ->call('viewRecoveryCodes')
+        ->assertSet('recoveryCodes', []);
+});
+
 test('recovery codes are only loaded when requested', function () {
     $user = User::factory()->create();
 
@@ -107,7 +137,7 @@ test('recovery codes are only loaded when requested', function () {
         'two_factor_confirmed_at' => now(),
     ])->save();
 
-    $this->actingAs($user);
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()]);
 
     Livewire::test('pages::settings.two-factor.recovery-codes')
         ->assertSet('recoveryCodes', [])
