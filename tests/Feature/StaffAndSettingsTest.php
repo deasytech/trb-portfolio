@@ -18,6 +18,8 @@ use App\Services\TransferService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
@@ -140,4 +142,51 @@ test('the settings page saves general settings for administrators and hides limi
     expect(app(SettingsService::class)->get(SettingsService::SUPPORT_PHONE))->toBe('+1 555 0100');
 
     $this->actingAs(User::factory()->customer()->create())->get('/admin/system-settings')->assertForbidden();
+});
+
+test('a super administrator can create staff who receive a reset link and an audit trail', function () {
+    Notification::fake();
+
+    $staff = app(StaffService::class)->create('New Admin', 'New.Admin@Example.com', RoleName::Administrator, $this->super, 'Joined ops');
+
+    expect($staff->email)->toBe('new.admin@example.com')
+        ->and($staff->hasRole(RoleName::Administrator->value))->toBeTrue()
+        ->and($staff->isActive())->toBeTrue()
+        ->and($staff->canAccessPanel(Filament::getPanel('admin')))->toBeTrue()
+        ->and(AuditEvent::where('event', 'staff.created')->where('reason', 'Joined ops')->exists())->toBeTrue();
+
+    Notification::assertSentTo($staff, ResetPassword::class);
+});
+
+test('staff creation is restricted and validated', function () {
+    $service = app(StaffService::class);
+
+    expect(fn () => $service->create('X', 'x@example.com', RoleName::Administrator, $this->admin, 'r'))->toThrow(AuthorizationException::class)
+        ->and(fn () => $service->create('X', 'x@example.com', RoleName::Customer, $this->super, 'r'))->toThrow(ValidationException::class)
+        ->and(fn () => $service->create('X', 'not-an-email', RoleName::Administrator, $this->super, 'r'))->toThrow(ValidationException::class)
+        ->and(fn () => $service->create('X', strtoupper($this->admin->email), RoleName::Administrator, $this->super, 'r'))->toThrow(ValidationException::class)
+        ->and(fn () => $service->create('X', 'x@example.com', RoleName::Administrator, $this->super, ' '))->toThrow(ValidationException::class);
+});
+
+test('the staff list page adds a staff member', function () {
+    Notification::fake();
+
+    Livewire::actingAs($this->super)->test(ListStaff::class)
+        ->callAction('createStaff', ['name' => 'Page Admin', 'email' => 'page@example.com', 'role' => RoleName::Administrator->value, 'reason' => 'New hire'])
+        ->assertNotified();
+
+    expect(User::where('email', 'page@example.com')->exists())->toBeTrue();
+});
+
+test('customers see the maintenance notice and it is escaped', function () {
+    app(SettingsService::class)->update([SettingsService::MAINTENANCE_NOTICE => 'Down <b>Sunday</b>'], $this->admin, 'Notice');
+    $customer = User::factory()->customer()->create();
+
+    $this->actingAs($customer)->get(route('customer.dashboard'))
+        ->assertSee('data-test="maintenance-notice"', false)
+        ->assertSee('Down &lt;b&gt;Sunday&lt;/b&gt;', false);
+
+    app(SettingsService::class)->update([SettingsService::MAINTENANCE_NOTICE => ''], $this->admin, 'Clear');
+
+    $this->actingAs($customer)->get(route('customer.dashboard'))->assertDontSee('maintenance-notice');
 });

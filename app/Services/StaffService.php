@@ -8,6 +8,8 @@ use App\Enums\UserStatus;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -17,6 +19,47 @@ use Illuminate\Validation\ValidationException;
 class StaffService
 {
     public function __construct(private AuditLogger $audit) {}
+
+    /**
+     * Create a staff account with an unusable random password and email a reset link,
+     * so no credential is ever chosen or shown by the person creating it.
+     */
+    public function create(string $name, string $email, RoleName $role, User $actor, string $reason): User
+    {
+        if (! $actor->isActive() || ! $actor->can(PermissionName::ManageStaff->value)) {
+            throw new AuthorizationException('You are not permitted to manage staff.');
+        }
+
+        if (! in_array($role, RoleName::staff(), true)) {
+            throw ValidationException::withMessages(['role' => 'Choose a staff role.']);
+        }
+
+        $name = trim($name);
+        $email = mb_strtolower(trim($email));
+        $reason = $this->requireReason($reason);
+
+        if ($name === '' || mb_strlen($name) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > 255) {
+            throw ValidationException::withMessages(['email' => 'Enter a name and a valid email address.']);
+        }
+
+        if (User::query()->whereRaw('LOWER(email) = ?', [$email])->exists()) {
+            throw ValidationException::withMessages(['email' => 'That email address is already in use.']);
+        }
+
+        $staff = DB::transaction(function () use ($name, $email, $role, $actor, $reason): User {
+            $staff = new User(['name' => $name, 'email' => $email, 'password' => Str::random(64)]);
+            $staff->forceFill(['email_verified_at' => now(), 'status' => UserStatus::Active])->save();
+            $staff->assignRole($role->value);
+
+            $this->audit->record('staff.created', $staff, $actor, $reason, ['role' => $role->value]);
+
+            return $staff;
+        });
+
+        Password::broker()->sendResetLink(['email' => $staff->email]);
+
+        return $staff;
+    }
 
     public function changeRole(User $staff, RoleName $role, User $actor, string $reason): User
     {
