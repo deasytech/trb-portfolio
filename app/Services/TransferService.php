@@ -32,6 +32,7 @@ class TransferService
     public function __construct(
         private AccountBalanceCalculator $balances,
         private AuditLogger $audit,
+        private SettingsService $settings,
     ) {}
 
     /**
@@ -49,6 +50,10 @@ class TransferService
             throw new AuthorizationException('This profile cannot request transfers.');
         }
 
+        if (! $this->settings->transfersEnabled()) {
+            throw ValidationException::withMessages(['amount' => 'Transfer requests are temporarily unavailable. Please try again later.']);
+        }
+
         $amount = $data['amount_minor'];
 
         // The "primary" account is the one debited (outgoing/internal) or credited (incoming).
@@ -56,8 +61,8 @@ class TransferService
         $primary = $this->ownedActiveAccount($customer, $primaryId, 'account');
         $destination = null;
 
-        $min = config('portfolio.transfers.min_minor');
-        $max = config('portfolio.transfers.max_minor');
+        $min = $this->settings->transferMinMinor();
+        $max = $this->settings->transferMaxMinor();
 
         if ($amount < $min || $amount > $max) {
             throw ValidationException::withMessages([

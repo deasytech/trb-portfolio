@@ -37,6 +37,8 @@ Every release: `php artisan down`, deploy, `php artisan migrate --force`, re-cac
 | `MAIL_MAILER`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` | real provider (default `log` sends nothing) |
 | `LOG_CHANNEL`, `LOG_LEVEL` | `stack`/`daily`, `warning` or higher |
 
+Transfer limits (`TRANSFER_MIN_MINOR`, `TRANSFER_MAX_MINOR`) are defaults; values saved in Admin > System settings override them. Only super administrators can change limits or disable transfers, and each change is audited.
+
 ## Integrations still awaiting provider selection
 - **Banking / payment rails:** none connected. Transfers are requests that staff approve and process; no external payment success is ever fabricated. Inbound deposits are verified manually by staff.
 - **Mail provider** (verification, password reset, notifications): choose and configure SMTP/API.
