@@ -184,4 +184,4 @@ return new #[Title('Transfers')] class extends Component {
     {
         return Transfer::query()->where('customer_id', Auth::id())->latest('id')->paginate(10);
     }
-}; 
+};

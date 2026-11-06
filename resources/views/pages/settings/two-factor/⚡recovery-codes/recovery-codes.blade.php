@@ -65,21 +65,19 @@
                 @enderror
 
                 @if (filled($recoveryCodes))
-                    <div
+                    <ul
                         class="grid gap-1 p-4 font-mono text-sm rounded-lg bg-zinc-100 dark:bg-white/5"
-                        role="list"
                         aria-label="{{ __('Recovery codes') }}"
                     >
                         @foreach($recoveryCodes as $code)
-                            <div
-                                role="listitem"
+                            <li
                                 class="select-text"
                                 wire:loading.class="opacity-50 animate-pulse"
                             >
                                 {{ $code }}
-                            </div>
+                            </li>
                         @endforeach
-                    </div>
+                    </ul>
                     <flux:text variant="subtle" class="text-xs">
                         {{ __('Each recovery code can be used once to access your account and will be removed after use. If you need more, click Regenerate codes above.') }}
                     </flux:text>

@@ -33,4 +33,4 @@ return new #[Title('Funds On Hold')] class extends Component {
             ->latest('id')
             ->paginate(10);
     }
-}; 
+};

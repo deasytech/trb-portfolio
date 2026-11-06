@@ -23,4 +23,4 @@ return new class extends Component {
 
         $this->redirect('/', navigate: true);
     }
-}; 
+};

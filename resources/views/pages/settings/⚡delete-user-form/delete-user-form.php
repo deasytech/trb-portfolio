@@ -2,4 +2,4 @@
 
 use Livewire\Component;
 
-return new class extends Component {}; 
+return new class extends Component {};

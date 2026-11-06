@@ -17,7 +17,7 @@
             <flux:input wire:model="name" :label="__('Name')" type="text" required autofocus autocomplete="name" />
 
             <flux:input wire:model="phone" :label="__('Phone number')" type="tel" autocomplete="tel" />
-            <flux:input wire:model="country" :label="__('Country (2-letter code)')" type="text" maxlength="2" autocomplete="off" />
+            <flux:input wire:model="country" :label="__('Country (2-letter code)')" type="text" maxlength="2" />
 
             <div>
                 <flux:input wire:model="email" :label="__('Email')" type="email" required autocomplete="email" />

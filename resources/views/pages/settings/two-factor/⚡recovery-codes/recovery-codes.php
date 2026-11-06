@@ -43,4 +43,4 @@ return new class extends Component {
             }
         }
     }
-}; 
+};
