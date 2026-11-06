@@ -196,7 +196,7 @@ test('customers with financial records cannot delete their account', function ()
 
     Livewire::test('pages::settings.delete-user-modal')->set('password', 'password')->call('deleteUser')->assertHasErrors('password');
 
-    expect($user->fresh())->not->toBeNull();
+    expect($user->fresh())->not->toBeNull()->and(auth()->check())->toBeTrue();
 });
 
 test('profile email is normalised and duplicates are detected regardless of case', function () {

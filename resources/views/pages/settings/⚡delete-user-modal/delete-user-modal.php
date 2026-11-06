@@ -28,9 +28,12 @@ return new class extends Component {
             return;
         }
 
-        // Log out first: logging out saves the remember token, which would re-insert a deleted user.
-        $logout();
         $user->delete();
+
+        // Logout only rotates (and saves) the remember token when one is set; clear it in memory
+        // so the deleted user is not re-inserted. If the delete fails, the session is untouched.
+        $user->setRememberToken(null);
+        $logout();
 
         $this->redirect('/', navigate: true);
     }
