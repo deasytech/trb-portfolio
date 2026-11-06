@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Middleware\EnsureCustomerArea;
 use App\Models\User;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -37,12 +38,13 @@ class FortifyServiceProvider extends ServiceProvider
     }
 
     /**
-     * Require a recent password confirmation for Livewire requests from pages that require one.
+     * Re-run password confirmation and the customer-area check on Livewire requests from pages that use them.
      */
     private function configurePasswordConfirmation(): void
     {
         Livewire::addPersistentMiddleware([
             RequirePassword::class,
+            EnsureCustomerArea::class,
         ]);
     }
 

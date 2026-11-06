@@ -45,6 +45,9 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail, Pas
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasRoles, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
+    /**
+     * Assign a unique customer reference to new users.
+     */
     protected static function booted(): void
     {
         static::creating(function (User $user): void {
@@ -73,16 +76,25 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail, Pas
         ];
     }
 
+    /**
+     * Whether the account may sign in and use the application.
+     */
     public function isActive(): bool
     {
         return $this->status === UserStatus::Active;
     }
 
+    /**
+     * Whether the user holds a staff role.
+     */
     public function isStaff(): bool
     {
         return $this->hasAnyRole(RoleName::staffValues());
     }
 
+    /**
+     * Only active staff may open the Filament panel.
+     */
     public function canAccessPanel(Panel $panel): bool
     {
         return $this->isStaff() && $this->isActive();

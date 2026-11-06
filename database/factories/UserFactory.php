@@ -74,16 +74,25 @@ class UserFactory extends Factory
         ]);
     }
 
+    /**
+     * Assign the customer role after creation.
+     */
     public function customer(): static
     {
         return $this->afterCreating(fn ($user) => $user->assignRole(Role::findOrCreate(RoleName::Customer->value, 'web')));
     }
 
+    /**
+     * Assign the administrator role after creation.
+     */
     public function administrator(): static
     {
         return $this->afterCreating(fn ($user) => $user->assignRole(Role::findOrCreate(RoleName::Administrator->value, 'web')));
     }
 
+    /**
+     * Assign the super administrator role after creation.
+     */
     public function superAdministrator(): static
     {
         return $this->afterCreating(fn ($user) => $user->assignRole(Role::findOrCreate(RoleName::SuperAdministrator->value, 'web')));

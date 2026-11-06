@@ -6,8 +6,10 @@ use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Spatie\Permission\Models\Role;
 
-test('guests are redirected to the admin login', function () {
+test('guests are redirected to the admin login, which defers to the Fortify login', function () {
     $this->get('/admin')->assertRedirect('/admin/login');
+
+    $this->get('/admin/login')->assertRedirect(route('login'));
 });
 
 test('customers cannot access the admin panel', function () {

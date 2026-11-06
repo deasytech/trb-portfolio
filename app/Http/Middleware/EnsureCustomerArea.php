@@ -13,6 +13,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class EnsureCustomerArea
 {
+    /**
+     * Redirect staff and sign out inactive users before the request continues.
+     */
     public function handle(Request $request, Closure $next): Response
     {
         /** @var User|null $user */

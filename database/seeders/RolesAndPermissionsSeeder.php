@@ -14,6 +14,9 @@ use Spatie\Permission\PermissionRegistrar;
  */
 class RolesAndPermissionsSeeder extends Seeder
 {
+    /**
+     * Create every role and permission and assign them to the staff roles.
+     */
     public function run(): void
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();

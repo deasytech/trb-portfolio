@@ -1,6 +1,10 @@
 <?php
 
+use App\Http\Middleware\EnsureCustomerArea;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 
 dataset('customer routes', [
     'customer.dashboard',
@@ -76,4 +80,27 @@ test('customers cannot set role or status through mass assignment', function () 
     expect($user->name)->toBe('New Name')
         ->and($user->isActive())->toBeTrue()
         ->and($user->customer_reference)->not->toBe('HACK');
+});
+
+test('any sign-in method is rejected for a suspended user', function () {
+    $user = User::factory()->customer()->suspended()->create();
+
+    expect(fn () => Auth::login($user))->toThrow(ValidationException::class);
+
+    $this->assertGuest();
+    expect($user->fresh()->last_login_at)->toBeNull();
+});
+
+test('the customer check runs before email verification', function () {
+    $this->actingAs(User::factory()->customer()->suspended()->unverified()->create())
+        ->get(route('customer.dashboard'))
+        ->assertRedirect(route('login'));
+
+    $this->actingAs(User::factory()->administrator()->unverified()->create())
+        ->get(route('customer.dashboard'))
+        ->assertRedirect('/admin');
+});
+
+test('the customer check also runs on Livewire updates', function () {
+    expect(Livewire::getPersistentMiddleware())->toContain(EnsureCustomerArea::class);
 });
