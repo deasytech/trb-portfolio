@@ -2,11 +2,12 @@
 
 use App\Concerns\PasswordValidationRules;
 use App\Livewire\Actions\Logout;
-use Illuminate\Support\Facades\Auth;
 use App\Models\FundsHold;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
-return new class extends Component {
+return new class extends Component
+{
     use PasswordValidationRules;
 
     public string $password = '';
