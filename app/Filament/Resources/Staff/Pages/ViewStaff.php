@@ -21,6 +21,9 @@ class ViewStaff extends ViewRecord
 {
     protected static string $resource = StaffResource::class;
 
+    /**
+     * Role change and activation actions, each requiring a reason.
+     */
     protected function getHeaderActions(): array
     {
         return [
@@ -43,6 +46,9 @@ class ViewStaff extends ViewRecord
         ];
     }
 
+    /**
+     * Build a confirm-with-reason status action shown for one starting status.
+     */
     private function statusAction(string $name, string $label, UserStatus $target, string $color, UserStatus $visibleWhen): Action
     {
         return Action::make($name)
@@ -58,17 +64,26 @@ class ViewStaff extends ViewRecord
             });
     }
 
+    /**
+     * Whether the current user may manage this staff member.
+     */
     private function canManage(): bool
     {
         return $this->actor()->can(PermissionName::ManageStaff->value) && ! $this->staff()->is($this->actor());
     }
 
+    /**
+     * Reload the record and form after a change.
+     */
     private function refreshRecord(): void
     {
         $this->getRecord()->refresh();
         $this->refreshFormData(['status']);
     }
 
+    /**
+     * The staff member being viewed.
+     */
     private function staff(): User
     {
         /** @var User $staff */
@@ -77,6 +92,9 @@ class ViewStaff extends ViewRecord
         return $staff;
     }
 
+    /**
+     * The signed-in staff user.
+     */
     private function actor(): User
     {
         /** @var User $actor */

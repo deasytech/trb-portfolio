@@ -6,6 +6,7 @@ use App\Enums\PermissionName;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -34,14 +35,25 @@ class SettingsService
     public const MAINTENANCE_NOTICE = 'maintenance_notice';
 
     /**
+     * The largest amount a customer can type into the transfer form, in minor units.
+     */
+    public const MAX_ENTERABLE_MINOR = 999_999_999_999;
+
+    /**
      * Keys that change financial behaviour.
      *
      * @var list<string>
      */
     public const FINANCIAL_KEYS = [self::TRANSFER_MIN, self::TRANSFER_MAX, self::TRANSFERS_ENABLED];
 
+    /**
+     * Create the service.
+     */
     public function __construct(private AuditLogger $audit) {}
 
+    /**
+     * Effective value of one setting: the stored value, else the config default.
+     */
     public function get(string $key): mixed
     {
         $setting = Setting::query()->where('key', $key)->first();
@@ -49,19 +61,43 @@ class SettingsService
         return $setting instanceof Setting ? $setting->value : $this->default($key);
     }
 
+    /**
+     * Whether customers may currently submit transfer requests.
+     */
     public function transfersEnabled(): bool
     {
         return (bool) $this->get(self::TRANSFERS_ENABLED);
     }
 
-    public function transferMinMinor(): int
+    /**
+     * The effective minimum and maximum, read together in one query so they always belong to the same configuration.
+     *
+     * @return array{min: int, max: int}
+     */
+    public function transferLimits(): array
     {
-        return (int) $this->get(self::TRANSFER_MIN);
+        $stored = Setting::query()->whereIn('key', [self::TRANSFER_MIN, self::TRANSFER_MAX])->pluck('value', 'key');
+
+        return [
+            'min' => (int) ($stored[self::TRANSFER_MIN] ?? $this->default(self::TRANSFER_MIN)),
+            'max' => (int) ($stored[self::TRANSFER_MAX] ?? $this->default(self::TRANSFER_MAX)),
+        ];
     }
 
+    /**
+     * The effective minimum transfer amount in minor units.
+     */
+    public function transferMinMinor(): int
+    {
+        return $this->transferLimits()['min'];
+    }
+
+    /**
+     * The effective maximum transfer amount in minor units.
+     */
     public function transferMaxMinor(): int
     {
-        return (int) $this->get(self::TRANSFER_MAX);
+        return $this->transferLimits()['max'];
     }
 
     /**
@@ -101,6 +137,18 @@ class SettingsService
 
         $values = $this->normalise($values);
 
+        // Serialises concurrent updates, including when no rows exist yet to lock.
+        return Cache::lock('settings:update', 10)->block(5, fn (): array => $this->apply($values, $actor, $reason));
+    }
+
+    /**
+     * Apply validated values inside one transaction while the update lock is held.
+     *
+     * @param  array<string, mixed>  $values
+     * @return list<string>
+     */
+    private function apply(array $values, User $actor, string $reason): array
+    {
         return DB::transaction(function () use ($values, $actor, $reason): array {
             $current = $this->all();
             $changed = array_keys(array_filter($values, fn (mixed $value, string $key): bool => $value !== $current[$key], ARRAY_FILTER_USE_BOTH));
@@ -109,9 +157,12 @@ class SettingsService
                 $this->authorize($actor, PermissionName::ManageFinancialLimits);
             }
 
-            $merged = array_merge($current, $values);
-            if ($merged[self::TRANSFER_MIN] >= $merged[self::TRANSFER_MAX]) {
-                throw ValidationException::withMessages(['transfer_min_minor' => 'The minimum must be lower than the maximum.']);
+            if (array_intersect($changed, [self::TRANSFER_MIN, self::TRANSFER_MAX]) !== []) {
+                $merged = array_merge($current, $values);
+
+                if ($merged[self::TRANSFER_MIN] >= $merged[self::TRANSFER_MAX]) {
+                    throw ValidationException::withMessages([self::TRANSFER_MIN => 'The minimum must be lower than the maximum.']);
+                }
             }
 
             foreach ($changed as $key) {
@@ -145,6 +196,9 @@ class SettingsService
         ];
     }
 
+    /**
+     * Config-backed default for a setting key.
+     */
     private function default(string $key): mixed
     {
         return match ($key) {
@@ -166,7 +220,8 @@ class SettingsService
     {
         foreach ($values as $key => $value) {
             $values[$key] = match ($key) {
-                self::TRANSFER_MIN, self::TRANSFER_MAX => $this->positiveInt($key, $value),
+                self::TRANSFER_MIN => $this->positiveInt($key, $value, self::MAX_ENTERABLE_MINOR),
+                self::TRANSFER_MAX => $this->positiveInt($key, $value),
                 self::TRANSFERS_ENABLED => (bool) $value,
                 self::DEFAULT_CURRENCY => $this->currency($value),
                 self::SUPPORT_EMAIL => $this->email($value),
@@ -177,15 +232,25 @@ class SettingsService
         return $values;
     }
 
-    private function positiveInt(string $key, mixed $value): int
+    /**
+     * Validate a whole number of at least one, optionally capped.
+     */
+    private function positiveInt(string $key, mixed $value, ?int $ceiling = null): int
     {
         if (! is_numeric($value) || (int) $value < 1 || (int) $value != $value) {
             throw ValidationException::withMessages([$key => 'Enter a whole number greater than zero.']);
         }
 
+        if ($ceiling !== null && (int) $value > $ceiling) {
+            throw ValidationException::withMessages([$key => 'Enter an amount no higher than '.number_format($ceiling).' minor units.']);
+        }
+
         return (int) $value;
     }
 
+    /**
+     * Validate and normalise a three-letter currency code.
+     */
     private function currency(mixed $value): string
     {
         $code = strtoupper(trim((string) $value));
@@ -196,6 +261,9 @@ class SettingsService
         return $code;
     }
 
+    /**
+     * Validate an optional email address, returning null when blank.
+     */
     private function email(mixed $value): ?string
     {
         $email = trim((string) $value);
@@ -209,6 +277,9 @@ class SettingsService
         return mb_substr($email, 0, 255);
     }
 
+    /**
+     * Require an active actor holding the given permission.
+     */
     private function authorize(User $actor, PermissionName $permission): void
     {
         if (! $actor->isActive() || ! $actor->can($permission->value)) {

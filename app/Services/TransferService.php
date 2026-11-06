@@ -61,8 +61,7 @@ class TransferService
         $primary = $this->ownedActiveAccount($customer, $primaryId, 'account');
         $destination = null;
 
-        $min = $this->settings->transferMinMinor();
-        $max = $this->settings->transferMaxMinor();
+        ['min' => $min, 'max' => $max] = $this->settings->transferLimits();
 
         if ($amount < $min || $amount > $max) {
             throw ValidationException::withMessages([

@@ -18,6 +18,9 @@ use Illuminate\Validation\ValidationException;
  */
 class StaffService
 {
+    /**
+     * Create the service.
+     */
     public function __construct(private AuditLogger $audit) {}
 
     /**
@@ -61,6 +64,9 @@ class StaffService
         return $staff;
     }
 
+    /**
+     * Replace a staff member's role, with a reason and an audit event.
+     */
     public function changeRole(User $staff, RoleName $role, User $actor, string $reason): User
     {
         $this->authorizeFor($staff, $actor);
@@ -94,6 +100,9 @@ class StaffService
         });
     }
 
+    /**
+     * Activate or deactivate a staff member, with a reason and an audit event.
+     */
     public function setStatus(User $staff, UserStatus $status, User $actor, string $reason): User
     {
         $this->authorizeFor($staff, $actor);
@@ -122,6 +131,9 @@ class StaffService
         });
     }
 
+    /**
+     * Require a permitted actor acting on another staff account.
+     */
     private function authorizeFor(User $staff, User $actor): void
     {
         if (! $actor->isActive() || ! $actor->can(PermissionName::ManageStaff->value)) {
@@ -137,6 +149,9 @@ class StaffService
         }
     }
 
+    /**
+     * Refuse to remove the last active super administrator.
+     */
     private function assertAnotherActiveSuperAdministrator(User $staff): void
     {
         $others = User::query()
@@ -151,6 +166,9 @@ class StaffService
         }
     }
 
+    /**
+     * Trim the reason and reject a blank one.
+     */
     private function requireReason(string $reason): string
     {
         $reason = trim($reason);

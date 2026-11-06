@@ -36,11 +36,17 @@ class StaffResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
+    /**
+     * Staff are visible only to users who can manage staff.
+     */
     protected static function viewPermission(): PermissionName
     {
         return PermissionName::ManageStaff;
     }
 
+    /**
+     * Limit the resource to users holding a staff role.
+     */
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
@@ -48,6 +54,9 @@ class StaffResource extends Resource
             ->with('roles');
     }
 
+    /**
+     * Read-only detail view.
+     */
     public static function infolist(Schema $schema): Schema
     {
         return $schema->components([
@@ -60,6 +69,9 @@ class StaffResource extends Resource
         ]);
     }
 
+    /**
+     * Staff list table.
+     */
     public static function table(Table $table): Table
     {
         return $table
@@ -80,6 +92,9 @@ class StaffResource extends Resource
             ->defaultSort('name');
     }
 
+    /**
+     * Index and read-only view pages.
+     */
     public static function getPages(): array
     {
         return [

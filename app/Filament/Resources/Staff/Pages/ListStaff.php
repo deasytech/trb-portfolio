@@ -17,6 +17,9 @@ class ListStaff extends ListRecords
 {
     protected static string $resource = StaffResource::class;
 
+    /**
+     * The add-staff action, which asks for an audit reason.
+     */
     protected function getHeaderActions(): array
     {
         return [

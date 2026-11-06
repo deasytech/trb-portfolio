@@ -23,6 +23,9 @@ class AdminOverview extends StatsOverviewWidget
 {
     protected ?string $heading = 'Operations overview';
 
+    /**
+     * Show the widget to active staff only.
+     */
     public static function canView(): bool
     {
         $user = auth()->user();

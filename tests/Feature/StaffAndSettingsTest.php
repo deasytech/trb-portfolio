@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\PermissionName;
 use App\Enums\RoleName;
 use App\Enums\TransferType;
 use App\Enums\UserStatus;
@@ -9,6 +10,7 @@ use App\Filament\Resources\Staff\Pages\ViewStaff;
 use App\Filament\Widgets\AdminOverview;
 use App\Models\Account;
 use App\Models\AuditEvent;
+use App\Models\FundsHold;
 use App\Models\LedgerTransaction;
 use App\Models\Setting;
 use App\Models\User;
@@ -205,4 +207,54 @@ test('the database seeder assigns permissions to roles even with model events di
 
     expect(Role::findByName(RoleName::SuperAdministrator->value, 'web')->permissions)->not->toBeEmpty()
         ->and(Role::findByName(RoleName::Administrator->value, 'web')->permissions)->not->toBeEmpty();
+});
+
+test('the overview widget groups held funds by currency and hides money from staff without ledger access', function () {
+    $usd = Account::factory()->for(User::factory()->customer()->create())->create(['currency' => 'USD']);
+    $eur = Account::factory()->for(User::factory()->customer()->create())->create(['currency' => 'EUR']);
+    FundsHold::factory()->for($usd)->create(['currency' => 'USD', 'amount_minor' => 1200, 'remaining_amount_minor' => 1200]);
+    FundsHold::factory()->for($eur)->create(['currency' => 'EUR', 'amount_minor' => 340, 'remaining_amount_minor' => 340]);
+    LedgerTransaction::factory()->for($usd)->credit(5000)->create(['currency' => 'USD']);
+
+    Livewire::actingAs($this->admin)->test(AdminOverview::class)
+        ->assertSee('Held funds (USD)')
+        ->assertSee('USD 12.00')
+        ->assertSee('Held funds (EUR)')
+        ->assertSee('EUR 3.40');
+
+    Role::findByName(RoleName::Administrator->value, 'web')->revokePermissionTo(PermissionName::ViewLedger->value);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    Livewire::actingAs(User::query()->findOrFail($this->admin->id))->test(AdminOverview::class)
+        ->assertSee('Active holds')
+        ->assertDontSee('Ledger balance')
+        ->assertDontSee('Held funds');
+});
+
+test('general settings can still be saved while the effective limits are inconsistent', function () {
+    config(['portfolio.transfers.min_minor' => 500, 'portfolio.transfers.max_minor' => 100]);
+
+    app(SettingsService::class)->update([SettingsService::SUPPORT_PHONE => '+1 555 0101'], $this->admin, 'Phone');
+    expect(app(SettingsService::class)->get(SettingsService::SUPPORT_PHONE))->toBe('+1 555 0101');
+
+    expect(fn () => app(SettingsService::class)->update([SettingsService::TRANSFER_MIN => 600], $this->super, 'Bad'))->toThrow(ValidationException::class);
+});
+
+test('the transfer minimum cannot exceed what customers can enter', function () {
+    $settings = app(SettingsService::class);
+
+    expect(fn () => $settings->update([SettingsService::TRANSFER_MIN => SettingsService::MAX_ENTERABLE_MINOR + 1], $this->super, 'x'))->toThrow(ValidationException::class);
+
+    $settings->update([SettingsService::TRANSFER_MAX => SettingsService::MAX_ENTERABLE_MINOR + 1], $this->super, 'Large max');
+    expect($settings->transferLimits())->toBe(['min' => 100, 'max' => SettingsService::MAX_ENTERABLE_MINOR + 1]);
+});
+
+test('transfer limits are read as one consistent pair', function () {
+    $settings = app(SettingsService::class);
+
+    expect($settings->transferLimits())->toBe(['min' => 100, 'max' => 10_000_000]);
+
+    $settings->update([SettingsService::TRANSFER_MIN => 200, SettingsService::TRANSFER_MAX => 9000], $this->super, 'Both');
+
+    expect($settings->transferLimits())->toBe(['min' => 200, 'max' => 9000]);
 });

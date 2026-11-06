@@ -34,6 +34,9 @@ class SystemSettings extends Page
     /** @var array<string, mixed> */
     public array $data = [];
 
+    /**
+     * Only staff with the settings permission may open the page.
+     */
     public static function canAccess(): bool
     {
         $user = auth()->user();
@@ -41,11 +44,17 @@ class SystemSettings extends Page
         return $user instanceof User && $user->isActive() && $user->can(PermissionName::ManageSettings->value);
     }
 
+    /**
+     * Load the current effective settings into the form.
+     */
     public function mount(): void
     {
         $this->fillForm();
     }
 
+    /**
+     * Define the settings form; financial fields are disabled without the elevated permission.
+     */
     public function form(Schema $schema): Schema
     {
         $canEditLimits = $this->canEditFinancial();
@@ -70,6 +79,9 @@ class SystemSettings extends Page
             ]);
     }
 
+    /**
+     * The save action, which asks for an audit reason.
+     */
     protected function getHeaderActions(): array
     {
         return [
@@ -108,16 +120,25 @@ class SystemSettings extends Page
         return Money::format($settings->transferMinMinor(), $currency).' to '.Money::format($settings->transferMaxMinor(), $currency);
     }
 
+    /**
+     * Reload the form from the stored settings.
+     */
     private function fillForm(): void
     {
         $this->formSchema()->fill(app(SettingsService::class)->all());
     }
 
+    /**
+     * The page's form schema.
+     */
     private function formSchema(): Schema
     {
         return $this->getSchema('form') ?? throw new LogicException('The settings form is not available.');
     }
 
+    /**
+     * Whether the current user may change transfer limits.
+     */
     private function canEditFinancial(): bool
     {
         $user = auth()->user();
