@@ -11,6 +11,8 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -74,6 +76,30 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail, Pas
             'status' => UserStatus::class,
             'last_login_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @return HasMany<Account, $this>
+     */
+    public function accounts(): HasMany
+    {
+        return $this->hasMany(Account::class);
+    }
+
+    /**
+     * @return HasMany<Transfer, $this>
+     */
+    public function transfers(): HasMany
+    {
+        return $this->hasMany(Transfer::class, 'customer_id');
+    }
+
+    /**
+     * @return HasOne<UserPreference, $this>
+     */
+    public function preference(): HasOne
+    {
+        return $this->hasOne(UserPreference::class);
     }
 
     /**
