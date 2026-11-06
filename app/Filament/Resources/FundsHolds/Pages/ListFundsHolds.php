@@ -26,6 +26,21 @@ class ListFundsHolds extends ListRecords
         return "{$account->user?->name} •••• {$account->account_number_last_four} ({$account->currency})";
     }
 
+    /**
+     * Accounts matching the search (all of them, capped, when empty) keyed by id.
+     *
+     * @return array<int, string>
+     */
+    private static function accountOptions(string $search = ''): array
+    {
+        return Account::query()->with('user')
+            ->where('account_number_last_four', 'like', "%{$search}%")
+            ->orWhereHas('user', fn ($q) => $q->where('name', 'like', "%{$search}%"))
+            ->limit(50)->get()
+            ->mapWithKeys(fn (Account $a): array => [$a->id => self::accountLabel($a)])
+            ->all();
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -34,13 +49,9 @@ class ListFundsHolds extends ListRecords
                 ->visible(fn (): bool => auth()->user()->can(PermissionName::PlaceHolds->value))
                 ->schema([
                     Select::make('account_id')->label('Account')->required()->searchable()
-                        ->getSearchResultsUsing(fn (string $search): array => Account::query()
-                            ->with('user')
-                            ->where('account_number_last_four', 'like', "%{$search}%")
-                            ->orWhereHas('user', fn ($q) => $q->where('name', 'like', "%{$search}%"))
-                            ->limit(20)->get()
-                            ->mapWithKeys(fn (Account $a): array => [$a->id => self::accountLabel($a)])
-                            ->all())
+                        ->preload()
+                        ->options(fn (): array => self::accountOptions())
+                        ->getSearchResultsUsing(fn (string $search): array => self::accountOptions($search))
                         ->getOptionLabelUsing(fn ($value): ?string => ($account = Account::query()->with('user')->whereKey($value)->first()) ? self::accountLabel($account) : null),
                     TextInput::make('amount')->required()->numeric()->minValue(0.01),
                     DateTimePicker::make('expires_at')->after('now'),

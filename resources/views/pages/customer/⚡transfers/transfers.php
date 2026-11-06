@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\Transfer;
 use App\Services\Money;
 use App\Services\TransferService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -17,27 +18,41 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-return new #[Title('Transfers')] class extends Component {
+return new #[Title('Transfers')] class extends Component
+{
     use WithPagination;
 
     public string $sourceAccountId = '';
+
     public string $destinationKind = 'external';
+
     public string $destinationAccountId = '';
+
     public string $beneficiaryName = '';
+
     public string $destinationIdentifier = '';
+
     public string $outAmount = '';
+
     public string $outDescription = '';
+
     public bool $confirmingOut = false;
+
     public string $outKey = '';
 
     #[Locked]
     public string $outReview = '';
 
     public string $depositAccountId = '';
+
     public string $senderName = '';
+
     public string $expectedAmount = '';
+
     public string $depositReference = '';
+
     public bool $confirmingIn = false;
+
     public string $inKey = '';
 
     #[Locked]
@@ -50,7 +65,7 @@ return new #[Title('Transfers')] class extends Component {
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, Account>
+     * @return Collection<int, Account>
      */
     #[Computed]
     public function accounts()

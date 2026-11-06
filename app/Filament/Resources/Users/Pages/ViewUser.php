@@ -4,10 +4,13 @@ namespace App\Filament\Resources\Users\Pages;
 
 use App\Enums\PermissionName;
 use App\Enums\UserStatus;
+use App\Filament\Concerns\NotifiesServiceErrors;
 use App\Filament\Resources\Users\UserResource;
 use App\Models\User;
 use App\Services\AdminActions;
+use App\Services\CustomerService;
 use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -17,14 +20,69 @@ use Filament\Resources\Pages\ViewRecord;
  */
 class ViewUser extends ViewRecord
 {
+    use NotifiesServiceErrors;
+
     protected static string $resource = UserResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
+            EditAction::make(),
+            $this->resendSetupLinkAction(),
+            $this->deleteAction(),
             $this->statusAction('suspend', 'Suspend customer', UserStatus::Suspended, 'danger', UserStatus::Active),
             $this->statusAction('reactivate', 'Reactivate customer', UserStatus::Active, 'success', UserStatus::Suspended),
         ];
+    }
+
+    /**
+     * Email the customer a fresh password-setup link.
+     */
+    private function resendSetupLinkAction(): Action
+    {
+        return Action::make('resendSetupLink')
+            ->label('Resend setup link')
+            ->requiresConfirmation()
+            ->visible(fn (): bool => auth()->user()->can(PermissionName::ManageCustomers->value))
+            ->action(function (): void {
+                /** @var User $customer */
+                $customer = $this->getRecord();
+                $sent = false;
+
+                if (! $this->attempt(function () use ($customer, &$sent): void {
+                    $sent = app(CustomerService::class)->sendSetupLink($customer, auth()->user());
+                })) {
+                    return;
+                }
+
+                $sent
+                    ? Notification::make()->title('Setup link sent')->success()->send()
+                    : Notification::make()->title('The setup link could not be sent')->danger()->send();
+            });
+    }
+
+    /**
+     * Delete a customer with no financial history, recording the reason.
+     */
+    private function deleteAction(): Action
+    {
+        return Action::make('delete')
+            ->label('Delete')
+            ->color('danger')
+            ->requiresConfirmation()
+            ->schema([Textarea::make('reason')->required()->maxLength(500)])
+            ->visible(fn (): bool => auth()->user()->can(PermissionName::ManageCustomers->value))
+            ->action(function (array $data): void {
+                /** @var User $customer */
+                $customer = $this->getRecord();
+
+                if (! $this->attempt(fn () => app(CustomerService::class)->delete($customer, auth()->user(), $data['reason']))) {
+                    return;
+                }
+
+                Notification::make()->title('Customer deleted')->success()->send();
+                $this->redirect(UserResource::getUrl('index'));
+            });
     }
 
     private function statusAction(string $name, string $label, UserStatus $target, string $color, UserStatus $visibleWhen): Action

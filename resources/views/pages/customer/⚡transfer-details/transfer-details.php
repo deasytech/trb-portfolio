@@ -1,15 +1,18 @@
 <?php
 
 use App\Enums\TransferStatus;
+use App\Exceptions\InvalidTransferTransition;
 use App\Models\Transfer;
 use App\Services\TransferService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-return new #[Title('Transfer Details')] class extends Component {
+return new #[Title('Transfer Details')] class extends Component
+{
     #[Locked]
     public Transfer $transfer;
 
@@ -26,14 +29,14 @@ return new #[Title('Transfer Details')] class extends Component {
 
         try {
             $this->transfer = $transfers->cancel($this->transfer, Auth::user());
-        } catch (\App\Exceptions\InvalidTransferTransition) {
+        } catch (InvalidTransferTransition) {
             $this->transfer->refresh();
             $this->addError('cancel', __('This transfer can no longer be cancelled.'));
         }
     }
 
     /**
-     * @return array<int, array{label: string, at: \Illuminate\Support\Carbon|null}>
+     * @return array<int, array{label: string, at: Carbon|null}>
      */
     #[Computed]
     public function timeline(): array

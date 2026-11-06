@@ -14,6 +14,7 @@ enum PermissionName: string
     case AdjustBalances = 'accounts.adjust';
 
     case ViewTransfers = 'transfers.view';
+    case ManageTransfers = 'transfers.manage';
     case ApproveTransfers = 'transfers.approve';
     case RejectTransfers = 'transfers.reject';
     case ProcessTransfers = 'transfers.process';

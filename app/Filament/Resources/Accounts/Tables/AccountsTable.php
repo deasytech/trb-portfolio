@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Accounts\Tables;
 use App\Enums\AccountStatus;
 use App\Enums\AccountType;
 use App\Models\Account;
+use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -29,7 +30,7 @@ class AccountsTable
                 SelectFilter::make('status')->options(collect(AccountStatus::cases())->mapWithKeys(fn (AccountStatus $s) => [$s->value => $s->label()])),
                 SelectFilter::make('currency')->options(fn (): array => Account::query()->distinct()->pluck('currency', 'currency')->all()),
             ])
-            ->recordActions([ViewAction::make()])
+            ->recordActions([ViewAction::make(), EditAction::make()])
             ->defaultSort('id', 'desc');
     }
 }

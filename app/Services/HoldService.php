@@ -70,6 +70,42 @@ class HoldService
     }
 
     /**
+     * Correct an active hold's stated reason and expiry. The amount is never edited; release and re-place instead.
+     */
+    public function update(FundsHold $hold, User $actor, string $holdReason, ?Carbon $expiresAt, string $changeReason): FundsHold
+    {
+        $this->authorize($actor, PermissionName::PlaceHolds);
+
+        $holdReason = trim($holdReason);
+        $changeReason = trim($changeReason);
+        if ($holdReason === '' || $changeReason === '') {
+            throw ValidationException::withMessages(['reason' => 'A reason is required.']);
+        }
+        if ($expiresAt && $expiresAt->isPast()) {
+            throw ValidationException::withMessages(['expires_at' => 'The expiry must be in the future.']);
+        }
+
+        return DB::transaction(function () use ($hold, $actor, $holdReason, $expiresAt, $changeReason): FundsHold {
+            $locked = FundsHold::query()->lockForUpdate()->findOrFail($hold->id);
+
+            if ($locked->effectiveStatus() !== HoldStatus::Active) {
+                throw ValidationException::withMessages(['hold' => 'Only active holds can be edited.']);
+            }
+
+            $from = ['reason' => $locked->reason, 'expires_at' => $locked->expires_at?->toIso8601String()];
+
+            $locked->forceFill(['reason' => $holdReason, 'expires_at' => $expiresAt])->save();
+
+            $this->audit->record('hold.updated', $locked, $actor, $changeReason, [
+                'from' => $from,
+                'to' => ['reason' => $holdReason, 'expires_at' => $expiresAt?->toIso8601String()],
+            ]);
+
+            return $locked;
+        });
+    }
+
+    /**
      * Release all (default) or part of a hold's remaining amount.
      */
     public function release(FundsHold $hold, User $actor, string $reason, ?int $amountMinor = null): FundsHold

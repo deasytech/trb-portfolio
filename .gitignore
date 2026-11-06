@@ -39,3 +39,6 @@ yarn-error.log
 /opencode.json
 /opencode.jsonc
 TRB_Portfolio_Laravel_Filament_Development_Spec.md
+/public/css/filament
+/public/js/filament
+/public/fonts/filament
