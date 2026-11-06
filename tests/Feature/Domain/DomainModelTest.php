@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\AccountStatus;
 use App\Models\Account;
 use App\Models\AuditEvent;
 use App\Models\FundsHold;
@@ -92,4 +93,23 @@ test('each user has at most one preference record', function () {
     UserPreference::factory()->for($user)->create();
 
     expect(fn () => UserPreference::factory()->for($user)->create())->toThrow(QueryException::class);
+});
+
+test('account last four digits are derived even with model events suppressed and kept on unrelated saves', function () {
+    $account = Account::withoutEvents(fn () => Account::factory()->create(['account_number' => '1234567890']));
+
+    expect($account->account_number_last_four)->toBe('7890');
+
+    $partial = Account::query()->select('id', 'status')->findOrFail($account->id);
+    $partial->status = AccountStatus::Frozen;
+    $partial->save();
+
+    expect($account->refresh()->account_number_last_four)->toBe('7890');
+});
+
+test('ledger rows cannot be changed or deleted even by bulk queries', function () {
+    $row = LedgerTransaction::factory()->create();
+
+    expect(fn () => LedgerTransaction::query()->whereKey($row->id)->update(['amount_minor' => 1]))->toThrow(QueryException::class)
+        ->and(fn () => LedgerTransaction::query()->whereKey($row->id)->delete())->toThrow(QueryException::class);
 });

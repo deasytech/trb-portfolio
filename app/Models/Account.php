@@ -7,6 +7,7 @@ use App\Enums\AccountType;
 use Database\Factories\AccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,13 +32,16 @@ class Account extends Model
     use HasFactory;
 
     /**
-     * Derive the last four digits whenever the account number is set.
+     * Setting the number also derives its last four digits, independent of model events.
+     *
+     * @return Attribute<string, string>
      */
-    protected static function booted(): void
+    protected function accountNumber(): Attribute
     {
-        static::saving(function (Account $account): void {
-            $account->account_number_last_four = substr($account->account_number, -4);
-        });
+        return Attribute::set(fn (string $value): array => [
+            'account_number' => $value,
+            'account_number_last_four' => substr($value, -4),
+        ]);
     }
 
     /**
