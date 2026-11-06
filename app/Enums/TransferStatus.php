@@ -27,4 +27,28 @@ enum TransferStatus: string
             self::Failed => 'Failed',
         };
     }
+
+    /**
+     * Statuses that have not reached a terminal state.
+     *
+     * @return array<int, self>
+     */
+    public static function open(): array
+    {
+        return [self::Pending, self::Approved, self::Processing];
+    }
+
+    /**
+     * Badge colour used by the status-badge component.
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::Pending => 'amber',
+            self::Approved, self::Processing => 'blue',
+            self::Completed => 'green',
+            self::Rejected, self::Failed => 'red',
+            self::Cancelled => 'zinc',
+        };
+    }
 }

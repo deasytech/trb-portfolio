@@ -12,4 +12,9 @@
 @fonts
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
+@auth
+    @if (auth()->user()->preference)
+        <script>try { localStorage.setItem('flux.appearance', @js(auth()->user()->preference->theme->value)); } catch (e) {}</script>
+    @endif
+@endauth
 @fluxAppearance

@@ -12,6 +12,8 @@ dataset('customer routes', [
     'customer.transfers.index',
     'customer.history',
     'customer.holds',
+    'customer.profile',
+    'customer.settings',
 ]);
 
 test('guests are redirected to login from customer pages', function (string $route) {

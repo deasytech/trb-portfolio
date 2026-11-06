@@ -19,4 +19,16 @@ enum AccountStatus: string
             self::Closed => 'Closed',
         };
     }
+
+    /**
+     * Badge colour used by the status-badge component.
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::Active => 'green',
+            self::Frozen => 'amber',
+            self::Closed => 'zinc',
+        };
+    }
 }

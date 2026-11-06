@@ -14,6 +14,8 @@ new #[Title('Profile settings')] class extends Component {
 
     public string $name = '';
     public string $email = '';
+    public string $phone = '';
+    public string $country = '';
 
     /**
      * Mount the component.
@@ -22,6 +24,8 @@ new #[Title('Profile settings')] class extends Component {
     {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->phone = Auth::user()->phone ?? '';
+        $this->country = Auth::user()->country ?? '';
     }
 
     /**
@@ -31,15 +35,24 @@ new #[Title('Profile settings')] class extends Component {
     {
         $user = Auth::user();
 
-        $validated = $this->validate($this->profileRules($user->id));
+        $validated = $this->validate($this->profileRules($user->id) + [
+            'phone' => ['nullable', 'string', 'max:32', 'regex:/^\+?[0-9 ()\-]{6,32}$/'],
+            'country' => ['nullable', 'string', 'size:2', 'alpha'],
+        ]);
 
-        $user->fill($validated);
+        $user->fill(collect($validated)->only(['name', 'email'])->all());
+        $user->phone = $validated['phone'] ?: null;
+        $user->country = $validated['country'] ? strtoupper($validated['country']) : null;
 
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
         }
 
         $user->save();
+
+        if ($user->wasChanged('email')) {
+            $user->sendEmailVerificationNotification();
+        }
 
         Flux::toast(variant: 'success', text: __('Profile updated.'));
     }
@@ -81,9 +94,21 @@ new #[Title('Profile settings')] class extends Component {
 
     <flux:heading level="2" class="sr-only">{{ __('Profile settings') }}</flux:heading>
 
-    <x-pages::settings.layout :heading="__('Profile')" :subheading="__('Update your name and email address')">
+    <x-pages::settings.layout :heading="__('Profile')" :subheading="__('Update your contact details')">
+        <dl class="grid grid-cols-2 gap-2 text-sm">
+            <dt class="text-zinc-500">{{ __('Customer ID') }}</dt>
+            <dd>{{ auth()->user()->customer_reference }}</dd>
+            <dt class="text-zinc-500">{{ __('Account status') }}</dt>
+            <dd>{{ __(auth()->user()->status->label()) }}</dd>
+            <dt class="text-zinc-500">{{ __('Joined') }}</dt>
+            <dd>{{ auth()->user()->created_at?->timezone(auth()->user()->displayTimezone())->format('M j, Y') }}</dd>
+        </dl>
+
         <form wire:submit="updateProfileInformation" class="my-6 w-full space-y-6">
             <flux:input wire:model="name" :label="__('Name')" type="text" required autofocus autocomplete="name" />
+
+            <flux:input wire:model="phone" :label="__('Phone number')" type="tel" autocomplete="tel" />
+            <flux:input wire:model="country" :label="__('Country (2-letter code)')" type="text" maxlength="2" autocomplete="country" />
 
             <div>
                 <flux:input wire:model="email" :label="__('Email')" type="email" required autocomplete="email" />
