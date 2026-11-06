@@ -11,6 +11,7 @@ enum TransferStatus: string
     case Rejected = 'rejected';
     case Cancelled = 'cancelled';
     case Failed = 'failed';
+    case Reversed = 'reversed';
 
     /**
      * Human-readable name.
@@ -25,6 +26,7 @@ enum TransferStatus: string
             self::Rejected => 'Rejected',
             self::Cancelled => 'Cancelled',
             self::Failed => 'Failed',
+            self::Reversed => 'Reversed',
         };
     }
 
@@ -48,7 +50,28 @@ enum TransferStatus: string
             self::Approved, self::Processing => 'blue',
             self::Completed => 'green',
             self::Rejected, self::Failed => 'red',
-            self::Cancelled => 'zinc',
+            self::Cancelled, self::Reversed => 'zinc',
         };
+    }
+
+    /**
+     * The single definition of the allowed lifecycle transitions.
+     *
+     * @return array<int, self>
+     */
+    public function allowedTransitions(): array
+    {
+        return match ($this) {
+            self::Pending => [self::Approved, self::Rejected, self::Cancelled],
+            self::Approved => [self::Processing, self::Completed, self::Rejected, self::Failed],
+            self::Processing => [self::Completed, self::Failed],
+            self::Completed => [self::Reversed],
+            self::Rejected, self::Cancelled, self::Failed, self::Reversed => [],
+        };
+    }
+
+    public function canTransitionTo(self $next): bool
+    {
+        return in_array($next, $this->allowedTransitions(), true);
     }
 }
