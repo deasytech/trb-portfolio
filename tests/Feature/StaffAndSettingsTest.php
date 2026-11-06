@@ -15,13 +15,17 @@ use App\Models\User;
 use App\Services\SettingsService;
 use App\Services\StaffService;
 use App\Services\TransferService;
+use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
@@ -189,4 +193,16 @@ test('customers see the maintenance notice and it is escaped', function () {
     app(SettingsService::class)->update([SettingsService::MAINTENANCE_NOTICE => ''], $this->admin, 'Clear');
 
     $this->actingAs($customer)->get(route('customer.dashboard'))->assertDontSee('maintenance-notice');
+});
+
+test('the database seeder assigns permissions to roles even with model events disabled', function () {
+    DB::table('role_has_permissions')->delete();
+    DB::table('roles')->delete();
+    DB::table('permissions')->delete();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $this->seed(DatabaseSeeder::class);
+
+    expect(Role::findByName(RoleName::SuperAdministrator->value, 'web')->permissions)->not->toBeEmpty()
+        ->and(Role::findByName(RoleName::Administrator->value, 'web')->permissions)->not->toBeEmpty();
 });
