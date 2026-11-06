@@ -8,7 +8,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Transfers')] class extends Component {
+return new #[Title('Transfers')] class extends Component {
     use WithPagination;
 
     /**

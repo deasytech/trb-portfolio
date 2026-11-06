@@ -6,7 +6,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Account Summary')] class extends Component {
+return new #[Title('Account Summary')] class extends Component {
     /**
      * @return array<int, array{account: \App\Models\Account, balance: \App\Services\AccountBalance}>
      */

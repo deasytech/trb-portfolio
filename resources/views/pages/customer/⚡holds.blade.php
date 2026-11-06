@@ -8,7 +8,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Funds On Hold')] class extends Component {
+return new #[Title('Funds On Hold')] class extends Component {
     use WithPagination;
 
     /**

@@ -10,7 +10,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Dashboard')] class extends Component {
+return new #[Title('Dashboard')] class extends Component {
     /**
      * @return Collection<string, array<string, int|string>>
      */
