@@ -53,6 +53,12 @@ return new #[Title('Transfers')] class extends Component {
 
     public function reviewOut(): void
     {
+        $this->validateOut();
+        $this->confirmingOut = true;
+    }
+
+    private function validateOut(): void
+    {
         $this->validate([
             'sourceAccountId' => ['required'],
             'destinationKind' => ['required', 'in:external,internal'],
@@ -62,8 +68,6 @@ return new #[Title('Transfers')] class extends Component {
             'outAmount' => ['required', 'regex:/^\d{1,10}(\.\d{1,2})?$/'],
             'outDescription' => ['nullable', 'string', 'max:255'],
         ], ['outAmount.regex' => __('Enter a valid amount, such as 250.00.')]);
-
-        $this->confirmingOut = true;
     }
 
     public function editOut(): void
@@ -80,6 +84,8 @@ return new #[Title('Transfers')] class extends Component {
         $internal = $this->destinationKind === 'internal';
 
         try {
+            $this->validateOut();
+
             $transfer = $transfers->request(Auth::user(), $internal ? TransferType::Internal : TransferType::OutgoingRequest, [
                 'source_account_id' => (int) $this->sourceAccountId,
                 'destination_account_id' => $internal ? (int) $this->destinationAccountId : null,
@@ -100,14 +106,18 @@ return new #[Title('Transfers')] class extends Component {
 
     public function reviewIn(): void
     {
+        $this->validateIn();
+        $this->confirmingIn = true;
+    }
+
+    private function validateIn(): void
+    {
         $this->validate([
             'depositAccountId' => ['required'],
             'senderName' => ['required', 'string', 'max:120'],
             'expectedAmount' => ['required', 'regex:/^\d{1,10}(\.\d{1,2})?$/'],
             'depositReference' => ['nullable', 'string', 'max:255'],
         ], ['expectedAmount.regex' => __('Enter a valid amount, such as 250.00.')]);
-
-        $this->confirmingIn = true;
     }
 
     public function editIn(): void
@@ -122,6 +132,8 @@ return new #[Title('Transfers')] class extends Component {
         }
 
         try {
+            $this->validateIn();
+
             $transfer = $transfers->request(Auth::user(), TransferType::IncomingRequest, [
                 'destination_account_id' => (int) $this->depositAccountId,
                 'beneficiary_name' => $this->senderName,
@@ -130,7 +142,11 @@ return new #[Title('Transfers')] class extends Component {
             ], $this->inKey);
         } catch (ValidationException $e) {
             $this->confirmingIn = false;
-            throw $e;
+
+            // The service reports 'amount'; this form's field is 'expectedAmount'.
+            throw ValidationException::withMessages(collect($e->errors())
+                ->mapWithKeys(fn (array $messages, string $key): array => [$key === 'amount' ? 'expectedAmount' : $key => $messages])
+                ->all());
         }
 
         $this->reset('depositAccountId', 'senderName', 'expectedAmount', 'depositReference', 'confirmingIn');

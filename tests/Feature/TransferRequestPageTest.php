@@ -23,6 +23,12 @@ function fillOutgoing($component, string $amount = '250.00')
         ->set('outAmount', $amount);
 }
 
+test('submitting without reviewing first creates nothing', function () {
+    fillOutgoing(Livewire::test('pages::customer.transfers'))->call('submitOut');
+
+    expect(Transfer::count())->toBe(0);
+});
+
 test('a transfer out needs explicit confirmation before it is created', function () {
     $component = fillOutgoing(Livewire::test('pages::customer.transfers'))->call('reviewOut');
 

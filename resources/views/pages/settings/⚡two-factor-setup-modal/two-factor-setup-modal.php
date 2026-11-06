@@ -19,6 +19,10 @@ return new class extends Component {
     #[Locked]
     public string $manualSetupKey = '';
 
+    /** True while this component has started an enrollment the user has not finished pairing. */
+    #[Locked]
+    public bool $enrollmentPending = false;
+
     public bool $showVerificationStep = false;
 
     public bool $setupComplete = false;
@@ -37,14 +41,17 @@ return new class extends Component {
     #[On('start-two-factor-setup')]
     public function startTwoFactorSetup(): void
     {
-        if (auth()->user()->hasEnabledTwoFactorAuthentication()) {
+        if (auth()->user()->hasEnabledTwoFactorAuthentication() && ! $this->enrollmentPending) {
             $this->dispatch('two-factor-enabled');
 
             return;
         }
 
-        $enableTwoFactorAuthentication = app(EnableTwoFactorAuthentication::class);
-        $enableTwoFactorAuthentication(auth()->user());
+        if (! $this->enrollmentPending) {
+            $enableTwoFactorAuthentication = app(EnableTwoFactorAuthentication::class);
+            $enableTwoFactorAuthentication(auth()->user());
+            $this->enrollmentPending = true;
+        }
 
         $this->loadSetupData();
     }
@@ -83,6 +90,7 @@ return new class extends Component {
             return;
         }
 
+        $this->enrollmentPending = false;
         $this->closeModal();
         $this->dispatch('two-factor-enabled');
     }
@@ -97,6 +105,7 @@ return new class extends Component {
         $confirmTwoFactorAuthentication(auth()->user(), $this->code);
 
         $this->setupComplete = true;
+        $this->enrollmentPending = false;
 
         $this->closeModal();
 

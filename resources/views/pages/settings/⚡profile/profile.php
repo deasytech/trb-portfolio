@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use App\Models\User;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Unique;
 use Livewire\Component;
 
 return new #[Title('Profile settings')] class extends Component {
@@ -35,7 +38,18 @@ return new #[Title('Profile settings')] class extends Component {
     {
         $user = Auth::user();
 
-        $validated = $this->validate($this->profileRules($user->id) + [
+        $this->email = Str::lower(trim($this->email));
+
+        $rules = $this->profileRules($user->id);
+        $rules['email'] = [
+            ...array_filter($rules['email'], fn ($rule): bool => ! $rule instanceof Unique),
+            // Case-insensitive, so a mixed-case copy of another address is still a duplicate.
+            fn (string $attribute, mixed $value, \Closure $fail) => User::query()->whereRaw('LOWER(email) = ?', [Str::lower($value)])->whereKeyNot($user->id)->exists()
+                ? $fail(__('validation.unique', ['attribute' => $attribute]))
+                : null,
+        ];
+
+        $validated = $this->validate($rules + [
             'phone' => ['nullable', 'string', 'max:32', 'regex:/^\+?[0-9 ()\-]{6,32}$/'],
             'country' => ['nullable', 'string', 'size:2', 'alpha'],
         ]);

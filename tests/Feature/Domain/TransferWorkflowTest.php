@@ -202,8 +202,33 @@ test('an active hold prevents completing a transfer that would use held funds', 
     $this->service->approve($transfer, $this->admin);
     FundsHold::query()->update(['amount_minor' => 99_000, 'remaining_amount_minor' => 99_000]);
 
-    $this->service->complete($transfer, $this->admin);
-})->throws(ValidationException::class);
+    expect(fn () => $this->service->complete($transfer, $this->admin))->toThrow(ValidationException::class);
+});
+
+test('a deposit cannot be reversed once its funds have been spent', function () {
+    $deposit = $this->service->request($this->customer, TransferType::IncomingRequest, [
+        'destination_account_id' => $this->account->id, 'beneficiary_name' => 'Acme', 'amount_minor' => 50_000,
+    ], 'dep-rev');
+    $this->service->approve($deposit, $this->admin);
+    $this->service->complete($deposit, $this->admin);
+
+    $spend = requestOut(['amount_minor' => 140_000]);
+    $this->service->approve($spend, $this->admin);
+    $this->service->complete($spend, $this->admin);
+
+    expect(fn () => $this->service->reverse($deposit, $this->super, 'Mistake'))->toThrow(ValidationException::class)
+        ->and($deposit->refresh()->status)->toBe(TransferStatus::Completed);
+});
+
+test('the amount limit message uses the account currency', function () {
+    $this->account->update(['currency' => 'EUR']);
+
+    try {
+        requestOut(['amount_minor' => 1]);
+    } catch (ValidationException $e) {
+        expect($e->errors()['amount'][0])->toContain('EUR');
+    }
+});
 
 test('a completed transfer is reversed with compensating entries and an audit event', function () {
     $transfer = requestOut();

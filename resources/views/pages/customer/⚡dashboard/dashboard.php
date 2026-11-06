@@ -41,6 +41,6 @@ return new #[Title('Dashboard')] class extends Component {
     #[Computed]
     public function activeHolds()
     {
-        return FundsHold::query()->where('customer_id', Auth::id())->where('status', HoldStatus::Active)->latest('id')->limit(5)->get();
+        return FundsHold::query()->where('customer_id', Auth::id())->reserving()->latest('id')->limit(5)->get();
     }
 };

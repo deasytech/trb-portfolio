@@ -3,6 +3,7 @@
 use App\Concerns\PasswordValidationRules;
 use App\Livewire\Actions\Logout;
 use Illuminate\Support\Facades\Auth;
+use App\Models\FundsHold;
 use Livewire\Component;
 
 return new class extends Component {
@@ -19,7 +20,17 @@ return new class extends Component {
             'password' => $this->currentPasswordRules(),
         ]);
 
-        tap(Auth::user(), $logout(...))->delete();
+        $user = Auth::user();
+
+        if ($user->accounts()->exists() || $user->transfers()->exists() || FundsHold::query()->where('customer_id', $user->id)->exists()) {
+            $this->addError('password', __('Accounts with financial records cannot be deleted here. Please contact support.'));
+
+            return;
+        }
+
+        // Log out first: logging out saves the remember token, which would re-insert a deleted user.
+        $logout();
+        $user->delete();
 
         $this->redirect('/', navigate: true);
     }

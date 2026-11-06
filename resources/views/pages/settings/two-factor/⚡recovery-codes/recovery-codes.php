@@ -41,6 +41,8 @@ return new class extends Component {
 
                 $this->recoveryCodes = [];
             }
+        } else {
+            $this->recoveryCodes = [];
         }
     }
 };

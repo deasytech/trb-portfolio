@@ -3,6 +3,7 @@
 use App\Enums\LedgerTransactionType;
 use App\Models\LedgerTransaction;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -32,7 +33,7 @@ return new #[Title('History')] class extends Component {
             'type' => ['nullable', 'in:'.implode(',', array_column(LedgerTransactionType::cases(), 'value'))],
             'accountId' => ['nullable', 'integer'],
             'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'to' => $this->from !== '' ? ['nullable', 'date', 'after_or_equal:from'] : ['nullable', 'date'],
             'minAmount' => ['nullable', 'numeric', 'min:0'],
             'maxAmount' => ['nullable', 'numeric', 'min:0'],
         ];
@@ -42,6 +43,11 @@ return new #[Title('History')] class extends Component {
     {
         if ($property !== 'selectedId') {
             $this->validateOnly($property);
+
+            if ($property === 'from' && $this->to !== '') {
+                $this->validateOnly('to');
+            }
+
             $this->resetPage();
         }
     }
@@ -75,7 +81,10 @@ return new #[Title('History')] class extends Component {
     {
         $query = $this->baseQuery()->with('account')->latest('posted_at')->latest('id');
 
-        if ($this->getErrorBag()->isNotEmpty()) {
+        // Filters can arrive via the URL, so validate before they reach the query.
+        try {
+            $this->validate();
+        } catch (ValidationException) {
             return $query->whereRaw('1 = 0')->paginate(15);
         }
 
@@ -85,8 +94,8 @@ return new #[Title('History')] class extends Component {
                 ->orWhere('description', 'like', '%'.$this->search.'%')))
             ->when($this->type !== '', fn ($q) => $q->where('type', $this->type))
             ->when($this->accountId !== '', fn ($q) => $q->where('account_id', (int) $this->accountId))
-            ->when($this->from !== '', fn ($q) => $q->where('posted_at', '>=', \Illuminate\Support\Carbon::parse($this->from, Auth::user()->displayTimezone())->startOfDay()))
-            ->when($this->to !== '', fn ($q) => $q->where('posted_at', '<=', \Illuminate\Support\Carbon::parse($this->to, Auth::user()->displayTimezone())->endOfDay()))
+            ->when($this->from !== '', fn ($q) => $q->where('posted_at', '>=', \Illuminate\Support\Carbon::parse($this->from, Auth::user()->displayTimezone())->startOfDay()->utc()))
+            ->when($this->to !== '', fn ($q) => $q->where('posted_at', '<=', \Illuminate\Support\Carbon::parse($this->to, Auth::user()->displayTimezone())->endOfDay()->utc()))
             ->when($this->minAmount !== '', fn ($q) => $q->where('amount_minor', '>=', (int) round($this->minAmount * 100)))
             ->when($this->maxAmount !== '', fn ($q) => $q->where('amount_minor', '<=', (int) round($this->maxAmount * 100)))
             ->paginate(15);

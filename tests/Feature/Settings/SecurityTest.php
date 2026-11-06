@@ -148,3 +148,32 @@ test('correct password must be provided to update password', function () {
 
     $response->assertHasErrors(['currentPassword']);
 });
+
+test('password update rejects a missing or mismatched confirmation', function (string $confirmation) {
+    $user = User::factory()->create(['password' => Hash::make('password')]);
+    $this->actingAs($user);
+
+    Livewire::test('pages::settings.security')
+        ->set('currentPassword', 'password')
+        ->set('password', 'new-password')
+        ->set('passwordConfirmation', $confirmation)
+        ->call('updatePassword')
+        ->assertHasErrors(['passwordConfirmation']);
+
+    expect(Hash::check('password', $user->refresh()->password))->toBeTrue();
+})->with(['', 'different-password']);
+
+test('two factor cannot be disabled after password confirmation has expired', function () {
+    $user = User::factory()->create();
+    $user->forceFill([
+        'two_factor_secret' => encrypt('test-secret'),
+        'two_factor_recovery_codes' => encrypt(json_encode(['code1'])),
+        'two_factor_confirmed_at' => now(),
+    ])->save();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time() - 100_000]);
+
+    Livewire::test('pages::settings.security')->call('disable');
+
+    expect($user->refresh()->two_factor_secret)->not->toBeNull();
+});

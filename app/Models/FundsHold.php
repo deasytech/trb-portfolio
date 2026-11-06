@@ -64,6 +64,16 @@ class FundsHold extends Model
     }
 
     /**
+     * Status as presented to customers: an active hold past its expiry no longer reserves funds.
+     */
+    public function effectiveStatus(): HoldStatus
+    {
+        return $this->status === HoldStatus::Active && $this->expires_at?->isPast()
+            ? HoldStatus::Expired
+            : $this->status;
+    }
+
+    /**
      * @return BelongsTo<Account, $this>
      */
     public function account(): BelongsTo

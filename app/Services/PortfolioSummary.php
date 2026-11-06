@@ -31,10 +31,13 @@ class PortfolioSummary
             'pending_count' => 0,
         ];
 
-        foreach ($user->accounts()->where('status', AccountStatus::Active)->get() as $account) {
+        foreach ($user->accounts()->whereIn('status', [AccountStatus::Active, AccountStatus::Frozen])->get() as $account) {
             $balance = $this->calculator->forAccount($account);
             $row = $totals->get($account->currency, $blank($account->currency));
-            $row['available_minor'] += $balance->availableMinor();
+            // Frozen funds still count as assets and held, but are never available.
+            if ($account->status === AccountStatus::Active) {
+                $row['available_minor'] += $balance->availableMinor();
+            }
             $row['held_minor'] += $balance->heldMinor;
             $row['assets_minor'] += $balance->ledgerMinor;
             $totals->put($account->currency, $row);

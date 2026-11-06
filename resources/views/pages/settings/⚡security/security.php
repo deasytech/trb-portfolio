@@ -161,6 +161,14 @@ return new #[Title('Security settings')] class extends Component {
      */
     public function disable(DisableTwoFactorAuthentication $disableTwoFactorAuthentication): void
     {
+        $confirmedAt = (int) session('auth.password_confirmed_at', 0);
+
+        if (time() - $confirmedAt > (int) config('auth.password_timeout', 900)) {
+            $this->redirectRoute('password.confirm');
+
+            return;
+        }
+
         $disableTwoFactorAuthentication(auth()->user());
 
         $this->twoFactorEnabled = false;
