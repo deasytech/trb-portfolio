@@ -106,6 +106,7 @@
                         @error('account') <flux:text class="text-red-600">{{ $message }}</flux:text> @enderror
                         <flux:input wire:model="senderName" :label="__('Sender name')" />
                         <flux:input wire:model="expectedAmount" :label="__('Expected amount')" inputmode="decimal" placeholder="0.00" />
+                        @error('expectedAmount') <flux:text class="text-red-600">{{ $message }}</flux:text> @enderror
                         <flux:input wire:model="depositReference" :label="__('Reference')" />
                         <flux:button type="submit" variant="primary">{{ __('Review deposit') }}</flux:button>
                     </form>

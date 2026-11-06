@@ -107,7 +107,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail, Pas
      */
     public function displayTimezone(): string
     {
-        return $this->preference?->timezone ?? config('app.timezone');
+        return $this->preference->timezone ?? config('app.timezone');
     }
 
     /**

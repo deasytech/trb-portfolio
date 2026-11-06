@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -29,12 +30,18 @@ return new #[Title('Transfers')] class extends Component {
     public bool $confirmingOut = false;
     public string $outKey = '';
 
+    #[Locked]
+    public string $outReview = '';
+
     public string $depositAccountId = '';
     public string $senderName = '';
     public string $expectedAmount = '';
     public string $depositReference = '';
     public bool $confirmingIn = false;
     public string $inKey = '';
+
+    #[Locked]
+    public string $inReview = '';
 
     public function mount(): void
     {
@@ -53,6 +60,13 @@ return new #[Title('Transfers')] class extends Component {
 
     public function reviewOut(): void
     {
+        $this->validateOut();
+        $this->outReview = $this->outFingerprint();
+        $this->confirmingOut = true;
+    }
+
+    private function validateOut(): void
+    {
         $this->validate([
             'sourceAccountId' => ['required'],
             'destinationKind' => ['required', 'in:external,internal'],
@@ -62,8 +76,6 @@ return new #[Title('Transfers')] class extends Component {
             'outAmount' => ['required', 'regex:/^\d{1,10}(\.\d{1,2})?$/'],
             'outDescription' => ['nullable', 'string', 'max:255'],
         ], ['outAmount.regex' => __('Enter a valid amount, such as 250.00.')]);
-
-        $this->confirmingOut = true;
     }
 
     public function editOut(): void
@@ -73,13 +85,21 @@ return new #[Title('Transfers')] class extends Component {
 
     public function submitOut(TransferService $transfers): void
     {
-        if (! $this->confirmingOut || $this->tooManySubmissions()) {
+        if (! $this->confirmingOut || ! hash_equals($this->outReview, $this->outFingerprint())) {
+            $this->confirmingOut = false;
+
+            return;
+        }
+
+        if ($this->tooManySubmissions()) {
             return;
         }
 
         $internal = $this->destinationKind === 'internal';
 
         try {
+            $this->validateOut();
+
             $transfer = $transfers->request(Auth::user(), $internal ? TransferType::Internal : TransferType::OutgoingRequest, [
                 'source_account_id' => (int) $this->sourceAccountId,
                 'destination_account_id' => $internal ? (int) $this->destinationAccountId : null,
@@ -100,14 +120,19 @@ return new #[Title('Transfers')] class extends Component {
 
     public function reviewIn(): void
     {
+        $this->validateIn();
+        $this->inReview = $this->inFingerprint();
+        $this->confirmingIn = true;
+    }
+
+    private function validateIn(): void
+    {
         $this->validate([
             'depositAccountId' => ['required'],
             'senderName' => ['required', 'string', 'max:120'],
             'expectedAmount' => ['required', 'regex:/^\d{1,10}(\.\d{1,2})?$/'],
             'depositReference' => ['nullable', 'string', 'max:255'],
         ], ['expectedAmount.regex' => __('Enter a valid amount, such as 250.00.')]);
-
-        $this->confirmingIn = true;
     }
 
     public function editIn(): void
@@ -117,11 +142,19 @@ return new #[Title('Transfers')] class extends Component {
 
     public function submitIn(TransferService $transfers): void
     {
-        if (! $this->confirmingIn || $this->tooManySubmissions()) {
+        if (! $this->confirmingIn || ! hash_equals($this->inReview, $this->inFingerprint())) {
+            $this->confirmingIn = false;
+
+            return;
+        }
+
+        if ($this->tooManySubmissions()) {
             return;
         }
 
         try {
+            $this->validateIn();
+
             $transfer = $transfers->request(Auth::user(), TransferType::IncomingRequest, [
                 'destination_account_id' => (int) $this->depositAccountId,
                 'beneficiary_name' => $this->senderName,
@@ -130,12 +163,29 @@ return new #[Title('Transfers')] class extends Component {
             ], $this->inKey);
         } catch (ValidationException $e) {
             $this->confirmingIn = false;
-            throw $e;
+
+            // The service reports 'amount'; this form's field is 'expectedAmount'.
+            throw ValidationException::withMessages(collect($e->errors())
+                ->mapWithKeys(fn (array $messages, string $key): array => [$key === 'amount' ? 'expectedAmount' : $key => $messages])
+                ->all());
         }
 
         $this->reset('depositAccountId', 'senderName', 'expectedAmount', 'depositReference', 'confirmingIn');
         $this->inKey = (string) Str::uuid();
         $this->announce($transfer);
+    }
+
+    /**
+     * Fingerprint of the values the customer reviewed, so edits after review need a fresh review.
+     */
+    private function outFingerprint(): string
+    {
+        return hash('sha256', json_encode([$this->sourceAccountId, $this->destinationKind, $this->destinationAccountId, $this->beneficiaryName, $this->destinationIdentifier, $this->outAmount, $this->outDescription]));
+    }
+
+    private function inFingerprint(): string
+    {
+        return hash('sha256', json_encode([$this->depositAccountId, $this->senderName, $this->expectedAmount, $this->depositReference]));
     }
 
     private function tooManySubmissions(): bool

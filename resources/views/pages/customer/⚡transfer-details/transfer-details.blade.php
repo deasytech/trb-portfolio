@@ -14,7 +14,17 @@
             <dd>{{ __($transfer->type->label()) }}</dd>
             <dt class="text-zinc-500">{{ __('Source account') }}</dt>
             <dd>{{ $transfer->sourceAccount?->maskedNumber() ?? '—' }}</dd>
-            <dt class="text-zinc-500">{{ __('Recipient') }}</dt>
+            <dt class="text-zinc-500">{{ __('Destination account') }}</dt>
+            <dd>
+                @if ($transfer->destinationAccount)
+                    {{ $transfer->destinationAccount->maskedNumber() }}
+                @elseif (filled($transfer->destination_identifier))
+                    {{ '•••• '.\Illuminate\Support\Str::substr($transfer->destination_identifier, -4) }}
+                @else
+                    —
+                @endif
+            </dd>
+            <dt class="text-zinc-500">{{ __('Recipient / sender') }}</dt>
             <dd>{{ $transfer->beneficiary_name ?? '—' }}</dd>
             <dt class="text-zinc-500">{{ __('Amount') }}</dt>
             <dd class="tabular-nums">{{ \App\Services\Money::format($transfer->amount_minor, $transfer->currency) }}</dd>

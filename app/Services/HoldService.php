@@ -84,7 +84,7 @@ class HoldService
         return DB::transaction(function () use ($hold, $actor, $reason, $amountMinor): FundsHold {
             $locked = FundsHold::query()->lockForUpdate()->findOrFail($hold->id);
 
-            if ($locked->status !== HoldStatus::Active) {
+            if ($locked->effectiveStatus() !== HoldStatus::Active) {
                 throw ValidationException::withMessages(['hold' => 'Only active holds can be released.']);
             }
 

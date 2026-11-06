@@ -50,19 +50,20 @@ class TransferService
         }
 
         $amount = $data['amount_minor'];
-        $min = config('portfolio.transfers.min_minor');
-        $max = config('portfolio.transfers.max_minor');
-
-        if ($amount < $min || $amount > $max) {
-            throw ValidationException::withMessages([
-                'amount' => 'Enter an amount between '.Money::format($min, 'USD').' and '.Money::format($max, 'USD').'.',
-            ]);
-        }
 
         // The "primary" account is the one debited (outgoing/internal) or credited (incoming).
         $primaryId = $type === TransferType::IncomingRequest ? ($data['destination_account_id'] ?? null) : ($data['source_account_id'] ?? null);
         $primary = $this->ownedActiveAccount($customer, $primaryId, 'account');
         $destination = null;
+
+        $min = config('portfolio.transfers.min_minor');
+        $max = config('portfolio.transfers.max_minor');
+
+        if ($amount < $min || $amount > $max) {
+            throw ValidationException::withMessages([
+                'amount' => 'Enter an amount between '.Money::format($min, $primary->currency).' and '.Money::format($max, $primary->currency).'.',
+            ]);
+        }
 
         if ($type === TransferType::Internal) {
             $destination = $this->ownedActiveAccount($customer, $data['destination_account_id'] ?? null, 'destination');
@@ -226,12 +227,14 @@ class TransferService
         return DB::transaction(function () use ($transfer, $actor, $reason): Transfer {
             $locked = Transfer::query()->lockForUpdate()->findOrFail($transfer->id);
             $this->assertTransition($locked, TransferStatus::Reversed);
-            $this->lockAccounts($locked);
+            $accounts = $this->lockAccounts($locked);
 
             $originals = LedgerTransaction::query()
                 ->where('related_type', $locked->getMorphClass())->where('related_id', $locked->id)
                 ->where('type', '!=', LedgerTransactionType::Reversal)
                 ->get();
+
+            $this->assertReversible($originals, $accounts);
 
             foreach ($originals as $original) {
                 LedgerTransaction::create([
@@ -256,6 +259,26 @@ class TransferService
 
             return $locked;
         });
+    }
+
+    /**
+     * A reversal that debits an account (such as undoing a deposit) must not overdraw it.
+     *
+     * @param  \Illuminate\Support\Collection<int, LedgerTransaction>  $originals
+     * @param  Collection<int, Account>  $accounts
+     */
+    private function assertReversible(\Illuminate\Support\Collection $originals, Collection $accounts): void
+    {
+        $debits = $originals->where('direction', LedgerDirection::Credit)->groupBy('account_id')
+            ->map(fn ($rows) => (int) $rows->sum('amount_minor'));
+
+        foreach ($debits as $accountId => $amount) {
+            $account = $accounts->firstWhere('id', $accountId) ?? Account::query()->lockForUpdate()->findOrFail($accountId);
+
+            if ($this->balances->forAccount($account)->availableMinor() < $amount) {
+                throw ValidationException::withMessages(['transfer' => 'The account no longer has enough available funds to reverse this transfer.']);
+            }
+        }
     }
 
     /**

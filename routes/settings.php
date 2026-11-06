@@ -2,6 +2,9 @@
 
 use Illuminate\Support\Facades\Route;
 
+Route::redirect('settings/profile', '/profile');
+Route::redirect('settings/appearance', '/settings');
+
 Route::middleware(['auth', 'customer'])->group(function () {
     Route::livewire('profile', 'pages::settings.profile')->name('customer.profile');
 });

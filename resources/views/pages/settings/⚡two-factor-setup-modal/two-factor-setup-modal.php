@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\TwoFactorSetupUnavailable;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Fortify\Actions\ConfirmTwoFactorAuthentication;
 use Laravel\Fortify\Actions\EnableTwoFactorAuthentication;
 use Livewire\Attributes\Computed;
@@ -18,6 +19,10 @@ return new class extends Component {
 
     #[Locked]
     public string $manualSetupKey = '';
+
+    /** True while this component has started an enrollment the user has not finished pairing. */
+    #[Locked]
+    public bool $enrollmentPending = false;
 
     public bool $showVerificationStep = false;
 
@@ -37,16 +42,33 @@ return new class extends Component {
     #[On('start-two-factor-setup')]
     public function startTwoFactorSetup(): void
     {
-        if (auth()->user()->hasEnabledTwoFactorAuthentication()) {
+        $user = auth()->user();
+
+        // A confirmed enrollment never exposes setup data, even if this component kept stale pending state.
+        if ($user->two_factor_confirmed_at || ($user->hasEnabledTwoFactorAuthentication() && ! $this->enrollmentPending)) {
+            $this->enrollmentPending = false;
+            Cache::forget(self::pendingKey($user->id));
             $this->dispatch('two-factor-enabled');
 
             return;
         }
 
-        $enableTwoFactorAuthentication = app(EnableTwoFactorAuthentication::class);
-        $enableTwoFactorAuthentication(auth()->user());
+        // Start (or restart, if the secret was cleared meanwhile) the enrollment.
+        if (! $this->enrollmentPending || ! $user->two_factor_secret) {
+            $enableTwoFactorAuthentication = app(EnableTwoFactorAuthentication::class);
+            $enableTwoFactorAuthentication($user);
+            $this->enrollmentPending = true;
+        }
+
+        // Tells the security page not to discard this unconfirmed secret from another tab.
+        Cache::put(self::pendingKey($user->id), true, now()->addMinutes(15));
 
         $this->loadSetupData();
+    }
+
+    public static function pendingKey(int $userId): string
+    {
+        return "two-factor-enrollment-pending:{$userId}";
     }
 
     /**
@@ -83,6 +105,8 @@ return new class extends Component {
             return;
         }
 
+        $this->enrollmentPending = false;
+        Cache::forget(self::pendingKey(auth()->id()));
         $this->closeModal();
         $this->dispatch('two-factor-enabled');
     }
@@ -97,6 +121,8 @@ return new class extends Component {
         $confirmTwoFactorAuthentication(auth()->user(), $this->code);
 
         $this->setupComplete = true;
+        $this->enrollmentPending = false;
+        Cache::forget(self::pendingKey(auth()->id()));
 
         $this->closeModal();
 

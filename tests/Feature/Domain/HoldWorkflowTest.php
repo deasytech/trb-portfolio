@@ -43,8 +43,8 @@ test('an active hold reduces available balance and is audited', function () {
 test('a hold cannot exceed the available balance', function () {
     $this->service->place($this->account, $this->admin, 90_000, 'First');
 
-    $this->service->place($this->account, $this->admin, 10_001, 'Second');
-})->throws(ValidationException::class);
+    expect(fn () => $this->service->place($this->account, $this->admin, 10_001, 'Second'))->toThrow(ValidationException::class);
+});
 
 test('customers cannot place or release holds', function () {
     $hold = FundsHold::factory()->for($this->account)->create();

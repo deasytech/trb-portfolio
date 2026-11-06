@@ -13,7 +13,8 @@
             <flux:table :paginate="$this->holds">
                 <flux:table.columns>
                     <flux:table.column>{{ __('Reason') }}</flux:table.column>
-                    <flux:table.column align="end">{{ __('Amount') }}</flux:table.column>
+                    <flux:table.column align="end">{{ __('Original amount') }}</flux:table.column>
+                    <flux:table.column align="end">{{ __('Remaining on hold') }}</flux:table.column>
                     <flux:table.column>{{ __('Placed') }}</flux:table.column>
                     <flux:table.column>{{ __('Expected release') }}</flux:table.column>
                     <flux:table.column>{{ __('Related transfer') }}</flux:table.column>
@@ -24,10 +25,11 @@
                         <flux:table.row wire:key="hold-{{ $hold->id }}">
                             <flux:table.cell>{{ $hold->reason }}</flux:table.cell>
                             <flux:table.cell align="end" class="tabular-nums">{{ \App\Services\Money::format($hold->amount_minor, $hold->currency) }}</flux:table.cell>
+                            <flux:table.cell align="end" class="tabular-nums">{{ \App\Services\Money::format($hold->effectiveStatus() === \App\Enums\HoldStatus::Active ? $hold->remaining_amount_minor : 0, $hold->currency) }}</flux:table.cell>
                             <flux:table.cell>{{ $hold->created_at->timezone(auth()->user()->displayTimezone())->format('M j, Y') }}</flux:table.cell>
                             <flux:table.cell>{{ $hold->expires_at?->timezone(auth()->user()->displayTimezone())->format('M j, Y') ?? '—' }}</flux:table.cell>
                             <flux:table.cell>{{ $hold->relatedTransfer?->reference ?? '—' }}</flux:table.cell>
-                            <flux:table.cell><x-status-badge :status="$hold->status" /></flux:table.cell>
+                            <flux:table.cell><x-status-badge :status="$hold->effectiveStatus()" /></flux:table.cell>
                         </flux:table.row>
                     @endforeach
                 </flux:table.rows>

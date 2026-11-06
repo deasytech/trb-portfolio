@@ -169,3 +169,43 @@ test('settings persist theme, timezone and notification preferences', function (
         ->call('save')
         ->assertHasErrors(['theme', 'timezone']);
 });
+
+test('an expired active hold is shown as expired and not as on hold', function () {
+    [$user, $account] = customerWithAccount();
+    FundsHold::factory()->create(['account_id' => $account->id, 'reason' => 'Lapsed', 'amount_minor' => 30_000, 'remaining_amount_minor' => 30_000, 'expires_at' => now()->subDay()]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::customer.holds')->assertSee(HoldStatus::Expired->label());
+    Livewire::test('pages::customer.dashboard')->assertSee('No funds are currently on hold.');
+});
+
+test('history ignores invalid URL filters instead of querying with them', function () {
+    [$user, $account] = customerWithAccount();
+    LedgerTransaction::factory()->credit(1_000)->create(['account_id' => $account->id, 'reference' => 'TXN-ANY']);
+
+    $this->actingAs($user);
+
+    Livewire::withQueryParams(['minAmount' => 'abc'])->test('pages::customer.history')
+        ->assertDontSee('TXN-ANY');
+});
+
+test('customers with financial records cannot delete their account', function () {
+    [$user] = customerWithAccount();
+    $this->actingAs($user);
+
+    Livewire::test('pages::settings.delete-user-modal')->set('password', 'password')->call('deleteUser')->assertHasErrors('password');
+
+    expect($user->fresh())->not->toBeNull()->and(auth()->check())->toBeTrue();
+});
+
+test('profile email is normalised and duplicates are detected regardless of case', function () {
+    User::factory()->create(['email' => 'taken@example.com']);
+    $user = User::factory()->customer()->create();
+    $this->actingAs($user);
+
+    Livewire::test('pages::settings.profile')->set('email', 'TAKEN@Example.com')->call('updateProfileInformation')->assertHasErrors(['email']);
+
+    Livewire::test('pages::settings.profile')->set('email', 'New@Example.com')->call('updateProfileInformation')->assertHasNoErrors();
+    expect($user->refresh()->email)->toBe('new@example.com');
+});

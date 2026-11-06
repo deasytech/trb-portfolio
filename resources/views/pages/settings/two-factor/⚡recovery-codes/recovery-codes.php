@@ -13,6 +13,10 @@ return new class extends Component {
      */
     public function viewRecoveryCodes(): void
     {
+        if ($this->passwordConfirmationExpired()) {
+            return;
+        }
+
         $this->loadRecoveryCodes();
     }
 
@@ -21,9 +25,29 @@ return new class extends Component {
      */
     public function regenerateRecoveryCodes(GenerateNewRecoveryCodes $generateNewRecoveryCodes): void
     {
+        if ($this->passwordConfirmationExpired()) {
+            return;
+        }
+
         $generateNewRecoveryCodes(auth()->user());
 
         $this->loadRecoveryCodes();
+    }
+
+    /**
+     * Redirect to the password confirmation screen when the confirmation is missing or stale.
+     */
+    private function passwordConfirmationExpired(): bool
+    {
+        $confirmedAt = (int) session('auth.password_confirmed_at', 0);
+
+        if (time() - $confirmedAt > (int) config('auth.password_timeout', 900)) {
+            $this->redirectRoute('password.confirm');
+
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -41,6 +65,8 @@ return new class extends Component {
 
                 $this->recoveryCodes = [];
             }
+        } else {
+            $this->recoveryCodes = [];
         }
     }
 };
