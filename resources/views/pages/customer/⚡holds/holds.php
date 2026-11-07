@@ -2,19 +2,21 @@
 
 use App\Enums\HoldStatus;
 use App\Models\FundsHold;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-return new #[Title('Funds On Hold')] class extends Component {
+return new #[Title('Funds On Hold')] class extends Component
+{
     use WithPagination;
 
     /**
      * Active (reserving) totals per currency.
      *
-     * @return \Illuminate\Support\Collection<int, array{currency: string, held_minor: int}>
+     * @return Collection<int, array{currency: string, held_minor: int}>
      */
     #[Computed]
     public function totals()

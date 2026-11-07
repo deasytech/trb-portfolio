@@ -28,6 +28,9 @@ class RolesAndPermissionsSeeder extends Seeder
             Permission::findOrCreate($name, 'web');
         }
 
+        // Model events may be disabled by the calling seeder, so flush explicitly before syncing.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         Role::findOrCreate(RoleName::Customer->value, 'web');
 
         Role::findOrCreate(RoleName::Administrator->value, 'web')

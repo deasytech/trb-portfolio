@@ -1,23 +1,27 @@
 <?php
 
 use App\Concerns\ProfileValidationRules;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\User;
 use Flux\Flux;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
-use Livewire\Attributes\Computed;
-use Livewire\Attributes\Title;
-use App\Models\User;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Unique;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 
-return new #[Title('Profile settings')] class extends Component {
+return new #[Title('Profile settings')] class extends Component
+{
     use ProfileValidationRules;
 
     public string $name = '';
+
     public string $email = '';
+
     public string $phone = '';
+
     public string $country = '';
 
     /**
@@ -44,7 +48,7 @@ return new #[Title('Profile settings')] class extends Component {
         $rules['email'] = [
             ...array_filter($rules['email'], fn ($rule): bool => ! $rule instanceof Unique),
             // Case-insensitive, so a mixed-case copy of another address is still a duplicate.
-            fn (string $attribute, mixed $value, \Closure $fail) => User::query()->whereRaw('LOWER(email) = ?', [Str::lower($value)])->whereKeyNot($user->id)->exists()
+            fn (string $attribute, mixed $value, Closure $fail) => User::query()->whereRaw('LOWER(email) = ?', [Str::lower($value)])->whereKeyNot($user->id)->exists()
                 ? $fail(__('validation.unique', ['attribute' => $attribute]))
                 : null,
         ];

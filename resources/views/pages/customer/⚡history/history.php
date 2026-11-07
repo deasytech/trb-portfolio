@@ -2,6 +2,7 @@
 
 use App\Enums\LedgerTransactionType;
 use App\Models\LedgerTransaction;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -10,16 +11,30 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-return new #[Title('History')] class extends Component {
+return new #[Title('History')] class extends Component
+{
     use WithPagination;
 
-    #[Url] public string $search = '';
-    #[Url] public string $type = '';
-    #[Url] public string $accountId = '';
-    #[Url] public string $from = '';
-    #[Url] public string $to = '';
-    #[Url] public string $minAmount = '';
-    #[Url] public string $maxAmount = '';
+    #[Url]
+    public string $search = '';
+
+    #[Url]
+    public string $type = '';
+
+    #[Url]
+    public string $accountId = '';
+
+    #[Url]
+    public string $from = '';
+
+    #[Url]
+    public string $to = '';
+
+    #[Url]
+    public string $minAmount = '';
+
+    #[Url]
+    public string $maxAmount = '';
 
     public ?int $selectedId = null;
 
@@ -102,8 +117,8 @@ return new #[Title('History')] class extends Component {
                 ->orWhere('description', 'like', '%'.$this->search.'%')))
             ->when($this->type !== '', fn ($q) => $q->where('type', $this->type))
             ->when($this->accountId !== '', fn ($q) => $q->where('account_id', (int) $this->accountId))
-            ->when($this->from !== '', fn ($q) => $q->where('posted_at', '>=', \Illuminate\Support\Carbon::parse($this->from, Auth::user()->displayTimezone())->startOfDay()->utc()))
-            ->when($this->to !== '', fn ($q) => $q->where('posted_at', '<=', \Illuminate\Support\Carbon::parse($this->to, Auth::user()->displayTimezone())->endOfDay()->utc()))
+            ->when($this->from !== '', fn ($q) => $q->where('posted_at', '>=', Carbon::parse($this->from, Auth::user()->displayTimezone())->startOfDay()->utc()))
+            ->when($this->to !== '', fn ($q) => $q->where('posted_at', '<=', Carbon::parse($this->to, Auth::user()->displayTimezone())->endOfDay()->utc()))
             ->when($this->minAmount !== '', fn ($q) => $q->where('amount_minor', '>=', (int) round($this->minAmount * 100)))
             ->when($this->maxAmount !== '', fn ($q) => $q->where('amount_minor', '<=', (int) round($this->maxAmount * 100)))
             ->paginate(15);

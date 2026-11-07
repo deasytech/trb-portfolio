@@ -7,10 +7,13 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -29,6 +32,16 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login(FortifyLogin::class)
             ->brandName('TRB Portfolio Staff')
+            ->maxContentWidth(Width::Full)
+            ->sidebarWidth('15rem')
+            ->collapsibleNavigationGroups()
+            ->navigationGroups([
+                NavigationGroup::make('People'),
+                NavigationGroup::make('Banking'),
+                NavigationGroup::make('Oversight'),
+                NavigationGroup::make('System'),
+            ])
+            ->renderHook(PanelsRenderHook::HEAD_END, fn () => view('filament.admin-styles'))
             ->colors([
                 'primary' => Color::Blue,
                 'green' => Color::Green,

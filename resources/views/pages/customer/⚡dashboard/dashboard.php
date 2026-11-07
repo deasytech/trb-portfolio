@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\HoldStatus;
 use App\Models\FundsHold;
 use App\Models\Transfer;
 use App\Services\PortfolioSummary;
@@ -10,7 +9,8 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-return new #[Title('Dashboard')] class extends Component {
+return new #[Title('Dashboard')] class extends Component
+{
     /**
      * @return Collection<string, array<string, int|string>>
      */
