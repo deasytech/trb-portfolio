@@ -123,6 +123,9 @@ class LedgerService
         }
     }
 
+    /**
+     * Require an active actor who may adjust balances.
+     */
     private function authorize(User $actor): void
     {
         if (! $actor->isActive() || ! $actor->can(PermissionName::AdjustBalances->value)) {
@@ -130,6 +133,9 @@ class LedgerService
         }
     }
 
+    /**
+     * Trim the reason and reject a blank one.
+     */
     private function requireReason(string $reason): string
     {
         $reason = trim($reason);

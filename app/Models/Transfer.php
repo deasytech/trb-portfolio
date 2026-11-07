@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $reference
  * @property string|null $idempotency_key
+ * @property string|null $request_fingerprint
  * @property int $customer_id
  * @property int|null $source_account_id
  * @property int|null $destination_account_id

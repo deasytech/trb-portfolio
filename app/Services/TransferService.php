@@ -30,6 +30,9 @@ use Illuminate\Validation\ValidationException;
  */
 class TransferService
 {
+    /**
+     * Create the service.
+     */
     public function __construct(
         private AccountBalanceCalculator $balances,
         private AuditLogger $audit,
@@ -56,8 +59,10 @@ class TransferService
 
         $creator = $actor ?? $customer;
 
+        $fingerprint = $this->fingerprint($type, $data);
+
         if ($existing = $this->findByKey($customer, $idempotencyKey)) {
-            return $existing;
+            return $this->assertSameRequest($existing, $fingerprint);
         }
 
         if (! $customer->isActive()) {
@@ -88,11 +93,12 @@ class TransferService
         }
 
         try {
-            $transfer = DB::transaction(function () use ($customer, $creator, $actor, $reason, $type, $data, $idempotencyKey, $primary, $destination, $amount): Transfer {
+            $transfer = DB::transaction(function () use ($customer, $creator, $actor, $reason, $type, $data, $idempotencyKey, $fingerprint, $primary, $destination, $amount): Transfer {
                 $transfer = new Transfer;
                 $transfer->forceFill([
                     'reference' => 'TRF-'.Str::upper(Str::random(12)),
                     'idempotency_key' => $idempotencyKey,
+                    'request_fingerprint' => $fingerprint,
                     'customer_id' => $customer->id,
                     'source_account_id' => $type === TransferType::IncomingRequest ? null : $primary->id,
                     'destination_account_id' => $type === TransferType::IncomingRequest ? $primary->id : $destination?->id,
@@ -119,12 +125,45 @@ class TransferService
             });
         } catch (UniqueConstraintViolationException) {
             // A concurrent request with the same key won the race.
-            return $this->findByKey($customer, $idempotencyKey) ?? throw new \RuntimeException('Duplicate transfer reference.');
+            $existing = $this->findByKey($customer, $idempotencyKey) ?? throw new \RuntimeException('Duplicate transfer reference.');
+
+            return $this->assertSameRequest($existing, $fingerprint);
         }
 
         return $transfer;
     }
 
+    /**
+     * A stable hash of the details that define a transfer request.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function fingerprint(TransferType $type, array $data): string
+    {
+        $parts = ['type' => $type->value];
+
+        foreach (['source_account_id', 'destination_account_id', 'beneficiary_name', 'destination_identifier', 'amount_minor', 'description'] as $key) {
+            $parts[$key] = $data[$key] ?? null;
+        }
+
+        return hash('sha256', json_encode($parts, JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * Return the stored transfer for an identical retry, or reject a reused key with changed details.
+     */
+    private function assertSameRequest(Transfer $existing, string $fingerprint): Transfer
+    {
+        if ($existing->request_fingerprint !== null && ! hash_equals($existing->request_fingerprint, $fingerprint)) {
+            throw ValidationException::withMessages(['amount' => 'This request was already submitted with different details. Start a new request.']);
+        }
+
+        return $existing;
+    }
+
+    /**
+     * Refuse new requests while transfers are switched off.
+     */
     private function assertTransfersEnabled(): void
     {
         if (! $this->settings->transfersEnabled()) {
@@ -132,6 +171,9 @@ class TransferService
         }
     }
 
+    /**
+     * Require the amount to sit within the configured limits.
+     */
     private function assertAmountWithinLimits(int $amount, string $currency): void
     {
         ['min' => $min, 'max' => $max] = $this->settings->transferLimits();
@@ -143,6 +185,9 @@ class TransferService
         }
     }
 
+    /**
+     * Approve a pending transfer.
+     */
     public function approve(Transfer $transfer, User $actor): Transfer
     {
         $this->authorize($actor, PermissionName::ApproveTransfers);
@@ -152,6 +197,9 @@ class TransferService
         });
     }
 
+    /**
+     * Reject a pending or approved transfer with a reason.
+     */
     public function reject(Transfer $transfer, User $actor, string $reason): Transfer
     {
         $this->authorize($actor, PermissionName::RejectTransfers);
@@ -163,6 +211,9 @@ class TransferService
         }, $reason);
     }
 
+    /**
+     * Let a customer cancel their own pending transfer.
+     */
     public function cancel(Transfer $transfer, User $customer): Transfer
     {
         if ($transfer->customer_id !== $customer->id) {
@@ -217,6 +268,9 @@ class TransferService
         return $this->transition($transfer, TransferStatus::Cancelled, $actor, 'transfer.cancelled', null, $reason);
     }
 
+    /**
+     * Move an approved transfer into processing.
+     */
     public function startProcessing(Transfer $transfer, User $actor): Transfer
     {
         $this->authorize($actor, PermissionName::ProcessTransfers);
@@ -226,6 +280,9 @@ class TransferService
         });
     }
 
+    /**
+     * Mark an approved or processing transfer as failed, with a reason.
+     */
     public function fail(Transfer $transfer, User $actor, string $reason): Transfer
     {
         $this->authorize($actor, PermissionName::ProcessTransfers);
@@ -378,6 +435,9 @@ class TransferService
         });
     }
 
+    /**
+     * Refuse a status change the lifecycle does not allow.
+     */
     private function assertTransition(Transfer $transfer, TransferStatus $to): void
     {
         if (! $transfer->status->canTransitionTo($to)) {
@@ -435,6 +495,9 @@ class TransferService
         };
     }
 
+    /**
+     * Resolve one of the customer's active accounts or fail validation.
+     */
     private function ownedActiveAccount(User $customer, int|string|null $id, string $field): Account
     {
         $account = $id ? Account::query()->where('user_id', $customer->id)->find($id) : null;
@@ -446,11 +509,17 @@ class TransferService
         return $account;
     }
 
+    /**
+     * Find a customer's transfer by idempotency key.
+     */
     private function findByKey(User $customer, string $key): ?Transfer
     {
         return Transfer::query()->where('customer_id', $customer->id)->where('idempotency_key', $key)->first();
     }
 
+    /**
+     * Require an active actor holding the given permission.
+     */
     private function authorize(User $actor, PermissionName $permission): void
     {
         if (! $actor->isActive() || ! $actor->can($permission->value)) {
@@ -458,6 +527,9 @@ class TransferService
         }
     }
 
+    /**
+     * Trim the reason and reject a blank one.
+     */
     private function requireReason(string $reason): string
     {
         $reason = trim($reason);
@@ -469,6 +541,9 @@ class TransferService
         return $reason;
     }
 
+    /**
+     * Tell the customer about the transfer's current status.
+     */
     private function notify(Transfer $transfer): void
     {
         $transfer->customer?->notify(new TransferStatusChanged($transfer));

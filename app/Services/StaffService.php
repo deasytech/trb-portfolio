@@ -69,18 +69,29 @@ class StaffService
     /**
      * Email a password-setup link to a staff member, returning whether it was sent.
      * Account creation never fails because of mail; callers surface a false result and can resend.
+     * A resend passes a reason, which is audited; the initial send passes none.
      */
-    public function sendSetupLink(User $staff, User $actor): bool
+    public function sendSetupLink(User $staff, User $actor, ?string $reason = null): bool
     {
         $this->authorizeFor($staff, $actor, allowSelf: true);
 
+        if ($reason !== null) {
+            $reason = $this->requireReason($reason);
+        }
+
         try {
-            return Password::broker()->sendResetLink(['email' => $staff->email]) === Password::RESET_LINK_SENT;
+            $sent = Password::broker()->sendResetLink(['email' => $staff->email]) === Password::RESET_LINK_SENT;
         } catch (Throwable $e) {
             report($e);
 
             return false;
         }
+
+        if ($sent && $reason !== null) {
+            $this->audit->record('staff.setup_link_resent', $staff, $actor, $reason);
+        }
+
+        return $sent;
     }
 
     /**
@@ -136,7 +147,7 @@ class StaffService
                 $locked->delete();
             });
         } catch (QueryException $e) {
-            if (stripos($e->getMessage(), 'foreign key') === false) {
+            if ((string) $e->getCode() !== '23503' && stripos($e->getMessage(), 'foreign key') === false) {
                 throw $e;
             }
 

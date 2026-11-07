@@ -28,6 +28,7 @@ use App\Models\LedgerTransaction;
 use App\Models\Transfer;
 use App\Models\User;
 use App\Services\SettingsService;
+use App\Services\StaffService;
 use App\Services\TransferService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -240,4 +241,24 @@ test('customer search treats wildcards literally', function () {
 
     expect(AccountForm::customerOptions('%'))->toBeEmpty()
         ->and(AccountForm::customerOptions('Plain'))->not->toBeEmpty();
+});
+
+test('a reused idempotency key returns the original only for identical details', function () {
+    $account = Account::factory()->for($this->customer)->create();
+    $service = app(TransferService::class);
+    $data = ['destination_account_id' => $account->id, 'amount_minor' => 2500];
+
+    $first = $service->request($this->customer, TransferType::IncomingRequest, $data, 'same-key');
+
+    expect($service->request($this->customer, TransferType::IncomingRequest, $data, 'same-key')->is($first))->toBeTrue()
+        ->and(fn () => $service->request($this->customer, TransferType::IncomingRequest, [...$data, 'amount_minor' => 9900], 'same-key'))->toThrow(ValidationException::class);
+});
+
+test('resending a staff setup link needs a reason and is audited', function () {
+    Notification::fake();
+    $service = app(StaffService::class);
+
+    expect(fn () => $service->sendSetupLink($this->admin, $this->super, ' '))->toThrow(ValidationException::class)
+        ->and($service->sendSetupLink($this->admin, $this->super, 'Lost email'))->toBeTrue()
+        ->and(AuditEvent::query()->where('event', 'staff.setup_link_resent')->where('reason', 'Lost email')->exists())->toBeTrue();
 });

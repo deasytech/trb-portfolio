@@ -135,11 +135,17 @@ class CustomerService
         }
     }
 
+    /**
+     * Whether a query failure was caused by a foreign-key constraint.
+     */
     private function isForeignKeyViolation(QueryException $e): bool
     {
-        return stripos($e->getMessage(), 'foreign key') !== false;
+        return (string) $e->getCode() === '23503' || stripos($e->getMessage(), 'foreign key') !== false;
     }
 
+    /**
+     * Require an active actor who may manage customers.
+     */
     private function authorize(User $actor): void
     {
         if (! $actor->isActive() || ! $actor->can(PermissionName::ManageCustomers->value)) {
@@ -147,6 +153,9 @@ class CustomerService
         }
     }
 
+    /**
+     * Refuse to act on anyone who is not a customer profile.
+     */
     private function assertCustomer(User $customer): void
     {
         if (! $customer->hasRole(RoleName::Customer->value) || $customer->isStaff()) {
@@ -154,6 +163,9 @@ class CustomerService
         }
     }
 
+    /**
+     * Validate the email address and ensure no other user holds it.
+     */
     private function assertEmailAvailable(string $email, ?User $ignore = null): void
     {
         $email = mb_strtolower(trim($email));
@@ -172,6 +184,9 @@ class CustomerService
         }
     }
 
+    /**
+     * Trim the reason and reject a blank one.
+     */
     private function requireReason(string $reason): string
     {
         $reason = trim($reason);

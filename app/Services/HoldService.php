@@ -20,11 +20,17 @@ use Illuminate\Validation\ValidationException;
  */
 class HoldService
 {
+    /**
+     * Create the service.
+     */
     public function __construct(
         private AccountBalanceCalculator $balances,
         private AuditLogger $audit,
     ) {}
 
+    /**
+     * Place an active hold on part of an account's available balance.
+     */
     public function place(Account $account, User $actor, int $amountMinor, string $reason, ?Carbon $expiresAt = null, ?Transfer $relatedTransfer = null): FundsHold
     {
         $this->authorize($actor, PermissionName::PlaceHolds);
@@ -153,6 +159,9 @@ class HoldService
         });
     }
 
+    /**
+     * Require an active actor holding the given permission.
+     */
     private function authorize(User $actor, PermissionName $permission): void
     {
         if (! $actor->isActive() || ! $actor->can($permission->value)) {

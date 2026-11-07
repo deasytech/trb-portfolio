@@ -51,13 +51,13 @@ class ViewStaff extends ViewRecord
                 }),
             Action::make('resendSetupLink')
                 ->label('Resend setup link')
-                ->requiresConfirmation()
+                ->schema([Textarea::make('reason')->required()->maxLength(500)])
                 ->visible(fn (): bool => $this->actor()->can(PermissionName::ManageStaff->value))
-                ->action(function (): void {
+                ->action(function (array $data): void {
                     $sent = false;
 
-                    if (! $this->attempt(function () use (&$sent): void {
-                        $sent = app(StaffService::class)->sendSetupLink($this->staff(), $this->actor());
+                    if (! $this->attempt(function () use (&$sent, $data): void {
+                        $sent = app(StaffService::class)->sendSetupLink($this->staff(), $this->actor(), $data['reason']);
                     })) {
                         return;
                     }
